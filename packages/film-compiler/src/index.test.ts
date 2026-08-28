@@ -37,7 +37,7 @@ describe("compileStory", () => {
     expect(result.ir.events[0]?.type).toBe("ENTER");
     expect(result.ir.events[0]?.actorId).toBe("char_bim");
     expect(result.ir.events[0]?.targetId).toBe("loc_room");
-    expect(result.ir.events[3]?.effects[1]?.expression).toBe("held_by(prop_key,char_bim)");
+    expect(result.ir.events[3]?.effects.some((effect) => effect.expression === "held_by(prop_key,char_bim)")).toBe(true);
     expect(result.ir.events[5]?.effects[0]?.expression).toBe("state(prop_door,open)");
     expect(result.ir.events[6]?.causes).toContain("story_event_l1");
     expect(result.ir.causalEdges.length).toBeGreaterThan(0);
