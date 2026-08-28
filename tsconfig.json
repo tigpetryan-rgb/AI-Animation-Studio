@@ -6,6 +6,7 @@
     { "path": "./packages/core-events" },
     { "path": "./packages/core-state" },
     { "path": "./packages/core-project" },
-    { "path": "./packages/film-compiler" }
+    { "path": "./packages/film-compiler" },
+    { "path": "./packages/workflow-engine" }
   ]
 }
