@@ -2,6 +2,8 @@
   "files": [],
   "references": [
     { "path": "./packages/core-types" },
-    { "path": "./packages/core-time" }
+    { "path": "./packages/core-time" },
+    { "path": "./packages/core-events" },
+    { "path": "./packages/core-state" }
   ]
 }
