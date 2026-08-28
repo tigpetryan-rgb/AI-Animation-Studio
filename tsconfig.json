@@ -8,6 +8,7 @@
     { "path": "./packages/core-project" },
     { "path": "./packages/film-compiler" },
     { "path": "./packages/workflow-engine" },
-    { "path": "./packages/timeline-engine" }
+    { "path": "./packages/timeline-engine" },
+    { "path": "./packages/continuity-engine" }
   ]
 }
