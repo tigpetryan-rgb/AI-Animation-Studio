@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "references": [
+    { "path": "../core-types" },
+    { "path": "../core-events" },
+    { "path": "../core-state" }
+  ],
+  "include": ["src/**/*.ts"]
+}
