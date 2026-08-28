@@ -3,7 +3,7 @@ import { createCanonicalState, type ActorState, type PropState } from "@aistudio
 import {
   asCharacterId,
   asPropId,
-  identityTransform,
+  IDENTITY_TRANSFORM,
 } from "@aistudio/core-types";
 import {
   contractFromCanonicalState,
@@ -21,14 +21,14 @@ const key = asPropId("prop_key");
 const actor: ActorState = {
   id: bim,
   revision: 0,
-  transform: identityTransform(),
+  transform: IDENTITY_TRANSFORM,
   heldPropIds: [key],
 };
 
 const prop: PropState = {
   id: key,
   revision: 0,
-  transform: identityTransform(),
+  transform: IDENTITY_TRANSFORM,
   holderCharacterId: bim,
 };
 
