@@ -23,6 +23,12 @@ import {
   serializePerformanceBenchmarkReport,
   type PerformanceBenchmarkReport,
 } from "./performance-benchmark";
+import {
+  runPersistenceStress,
+  serializePersistenceStressReport,
+  verifyPersistedStressProject,
+  type PersistenceStressReport,
+} from "./persistence-stress";
 import { createStudioBootModel } from "./runtime";
 
 function probeWebGl2(): boolean {
@@ -65,6 +71,9 @@ let deviceCheckRunning = false;
 let performanceReport: PerformanceBenchmarkReport | null = null;
 let performanceBenchmarkError: string | null = null;
 let performanceBenchmarkRunning = false;
+let persistenceReport: PersistenceStressReport | null = null;
+let persistenceError: string | null = null;
+let persistenceRunning = false;
 const root = requireStudioRoot();
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string): HTMLElementTagNameMap[K] {
@@ -167,6 +176,44 @@ function downloadPerformanceReport(report: PerformanceBenchmarkReport): void {
   URL.revokeObjectURL(url);
 }
 
+async function runPersistenceCheck(): Promise<void> {
+  persistenceRunning = true;
+  persistenceError = null;
+  render();
+  try {
+    persistenceReport = await runPersistenceStress();
+  } catch (error) {
+    persistenceError = error instanceof Error ? error.message : "Persistence stress failed.";
+  } finally {
+    persistenceRunning = false;
+    render();
+  }
+}
+
+async function verifyPersistenceCheck(): Promise<void> {
+  persistenceRunning = true;
+  persistenceError = null;
+  render();
+  try {
+    persistenceReport = await verifyPersistedStressProject();
+  } catch (error) {
+    persistenceError = error instanceof Error ? error.message : "Persisted project verification failed.";
+  } finally {
+    persistenceRunning = false;
+    render();
+  }
+}
+
+function downloadPersistenceReport(report: PersistenceStressReport): void {
+  const blob = new Blob([serializePersistenceStressReport(report)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `aistudio-persistence-stress-${report.capturedAt.replaceAll(":", "-")}.json`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 function renderDeviceVerification(inspector: HTMLElement): void {
   inspector.append(text("h3", "Device verification"));
 
@@ -264,7 +311,7 @@ function renderPerformanceBenchmark(inspector: HTMLElement): void {
   const runButton = el("button", "performance-benchmark-button");
   runButton.type = "button";
   runButton.textContent = performanceBenchmarkRunning ? "Benchmarking…" : "Run performance benchmark";
-  runButton.disabled = performanceBenchmarkRunning || deviceCheckRunning;
+  runButton.disabled = performanceBenchmarkRunning || deviceCheckRunning || persistenceRunning;
   runButton.addEventListener("click", () => void runBenchmark());
   inspector.append(runButton);
 
@@ -317,6 +364,83 @@ function renderPerformanceBenchmark(inspector: HTMLElement): void {
   downloadButton.textContent = "Download performance report";
   downloadButton.addEventListener("click", () => downloadPerformanceReport(performanceReport as PerformanceBenchmarkReport));
   inspector.append(downloadButton, text("p", performanceReport.note, "verification-note"));
+}
+
+function renderPersistenceStress(inspector: HTMLElement): void {
+  inspector.append(text("h3", "Persistence / offline stress"));
+  inspector.append(
+    text(
+      "p",
+      "Persists a real canonical StudioProject with dual OPFS slots and an IndexedDB commit pointer, then verifies it after reload/offline reload.",
+      "verification-note",
+    ),
+  );
+
+  const controls = el("div", "device-check-controls");
+  const runButton = el("button", "persistence-stress-button");
+  runButton.type = "button";
+  runButton.textContent = persistenceRunning ? "Saving…" : "Run persistence stress";
+  runButton.disabled = persistenceRunning || performanceBenchmarkRunning || deviceCheckRunning;
+  runButton.addEventListener("click", () => void runPersistenceCheck());
+
+  const verifyButton = el("button", "persistence-verify-button");
+  verifyButton.type = "button";
+  verifyButton.textContent = persistenceRunning ? "Verifying…" : "Verify persisted project";
+  verifyButton.disabled = persistenceRunning;
+  verifyButton.addEventListener("click", () => void verifyPersistenceCheck());
+  controls.append(runButton, verifyButton);
+  inspector.append(controls);
+
+  if (persistenceError) {
+    const error = text("p", persistenceError, "device-report-error");
+    error.setAttribute("role", "alert");
+    inspector.append(error);
+  }
+
+  if (!persistenceReport) return;
+
+  const summary = text(
+    "div",
+    `Persistence: ${persistenceReport.summary}`,
+    `persistence-summary persistence-${persistenceReport.summary.toLowerCase()}`,
+  );
+  summary.dataset.persistenceSummary = persistenceReport.summary;
+  summary.dataset.persistenceOnline = String(persistenceReport.online);
+  inspector.append(summary);
+
+  const meta = el("div", "device-report-meta");
+  meta.append(
+    text("span", `Build ${persistenceReport.build.commit.slice(0, 12)}`),
+    text("span", `Slot ${persistenceReport.activeSlot}`),
+    text("span", `Save ${persistenceReport.saveRevision}`),
+    text("span", persistenceReport.online ? "online" : "offline"),
+  );
+  inspector.append(meta);
+
+  const project = el("div", "persistence-project");
+  project.dataset.persistenceProjectId = persistenceReport.project.projectId;
+  project.append(
+    text("strong", persistenceReport.project.name),
+    text("p", `Project ${persistenceReport.project.projectId} · state rev ${persistenceReport.project.stateRevision} · ${persistenceReport.recoverySource}`, "muted"),
+  );
+  inspector.append(project);
+
+  const checks = el("ul", "device-check-list");
+  for (const check of persistenceReport.checks) {
+    const item = el("li", `check-${check.status.toLowerCase()}`);
+    item.dataset.persistenceCheckId = check.id;
+    const headline = el("div", "check-headline");
+    headline.append(text("span", check.id), text("strong", check.status));
+    item.append(headline, text("p", check.detail, "muted"));
+    checks.append(item);
+  }
+  inspector.append(checks);
+
+  const downloadButton = el("button", "persistence-report-download");
+  downloadButton.type = "button";
+  downloadButton.textContent = "Download persistence report";
+  downloadButton.addEventListener("click", () => downloadPersistenceReport(persistenceReport as PersistenceStressReport));
+  inspector.append(downloadButton, text("p", persistenceReport.note, "verification-note"));
 }
 
 function render(): void {
@@ -387,6 +511,7 @@ function render(): void {
 
   renderDeviceVerification(inspector);
   renderPerformanceBenchmark(inspector);
+  renderPersistenceStress(inspector);
   body.append(assets, viewport, inspector);
 
   const timeline = el("footer", "timeline");
