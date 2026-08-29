@@ -171,9 +171,11 @@ function matrix(): Uint8Array {
 }
 
 function languageUnd(): Uint8Array {
-  return u16((("u".charCodeAt(0) - 0x60) << 10)
+  return u16(
+    (("u".charCodeAt(0) - 0x60) << 10)
     | (("n".charCodeAt(0) - 0x60) << 5)
-    | ("d".charCodeAt(0) - 0x60));
+    | ("d".charCodeAt(0) - 0x60),
+  );
 }
 
 function ftyp(): Uint8Array {
@@ -262,8 +264,7 @@ function hdlr(handlerType: "vide" | "soun", name: string): Uint8Array {
 
 function dinf(): Uint8Array {
   const url = fullBox("url ", 0, 0x000001);
-  const dref = fullBox("dref", 0, 0, u32(1), url);
-  return box("dinf", dref);
+  return box("dinf", fullBox("dref", 0, 0, u32(1), url));
 }
 
 function vmhd(): Uint8Array {
@@ -434,19 +435,21 @@ function videoTrak(
   movieDuration: number,
   chunkOffset: number,
 ): Uint8Array {
-  const minf = box(
-    "minf",
-    vmhd(),
-    dinf(),
-    videoStbl(width, height, avcC, durations, sizes, keySamples, chunkOffset),
+  return box(
+    "trak",
+    tkhd(1, movieDuration, width, height, 0),
+    box(
+      "mdia",
+      mdhd(AV_MP4_VIDEO_TIMESCALE, mediaDuration),
+      hdlr("vide", "VideoHandler"),
+      box(
+        "minf",
+        vmhd(),
+        dinf(),
+        videoStbl(width, height, avcC, durations, sizes, keySamples, chunkOffset),
+      ),
+    ),
   );
-  const mdia = box(
-    "mdia",
-    mdhd(AV_MP4_VIDEO_TIMESCALE, mediaDuration),
-    hdlr("vide", "VideoHandler"),
-    minf,
-  );
-  return box("trak", tkhd(1, movieDuration, width, height, 0), mdia);
 }
 
 function audioTrak(
@@ -457,19 +460,21 @@ function audioTrak(
   movieDuration: number,
   chunkOffset: number,
 ): Uint8Array {
-  const minf = box(
-    "minf",
-    smhd(),
-    dinf(),
-    audioStbl(numberOfChannels, durations, sizes, chunkOffset),
+  return box(
+    "trak",
+    tkhd(2, movieDuration, 0, 0, 0x0100),
+    box(
+      "mdia",
+      mdhd(AV_MP4_OPUS_SAMPLE_RATE, mediaDuration),
+      hdlr("soun", "SoundHandler"),
+      box(
+        "minf",
+        smhd(),
+        dinf(),
+        audioStbl(numberOfChannels, durations, sizes, chunkOffset),
+      ),
+    ),
   );
-  const mdia = box(
-    "mdia",
-    mdhd(AV_MP4_OPUS_SAMPLE_RATE, mediaDuration),
-    hdlr("soun", "SoundHandler"),
-    minf,
-  );
-  return box("trak", tkhd(2, movieDuration, 0, 0, 0x0100), mdia);
 }
 
 function moov(
@@ -527,8 +532,7 @@ function moov(
 }
 
 function toTimescale(us: number, timescale: number): number {
-  const scaled = Math.round((us * timescale) / 1_000_000);
-  return Math.max(1, scaled);
+  return Math.max(1, Math.round((us * timescale) / 1_000_000));
 }
 
 function sampleDurationsUs<T extends { readonly timestampUs: number; readonly durationUs: number }>(
@@ -539,9 +543,7 @@ function sampleDurationsUs<T extends { readonly timestampUs: number; readonly du
     const chunk = chunks[index];
     if (chunk === undefined) continue;
     const next = chunks[index + 1];
-    const durationUs = next === undefined
-      ? chunk.durationUs
-      : next.timestampUs - chunk.timestampUs;
+    const durationUs = next === undefined ? chunk.durationUs : next.timestampUs - chunk.timestampUs;
     if (!Number.isSafeInteger(durationUs) || durationUs <= 0) {
       throw new Mp4ExportError("MP4_EXPORT_INVALID_CHUNK", "MP4 chunks must have strictly increasing timestamps.");
     }
@@ -597,7 +599,12 @@ function validateAudioChunks(chunks: readonly OpusMp4MuxChunk[]): void {
   }
 }
 
-function validateMuxConfig(width: number, height: number, channels: number, avcC: Uint8Array): asserts channels is 1 | 2 {
+function validateMuxConfig(
+  width: number,
+  height: number,
+  channels: number,
+  avcC: Uint8Array,
+): asserts channels is 1 | 2 {
   if (!Number.isInteger(width) || width <= 0 || width > 16_384) {
     throw new Mp4ExportError("MP4_EXPORT_INVALID_CONFIG", `Invalid video width ${width}.`);
   }
@@ -648,7 +655,6 @@ export function muxAvcOpusMp4(
     0,
     0,
   );
-
   const videoBytes = concat(videoChunks.map((chunk) => chunk.data));
   const audioBytes = concat(audioChunks.map((chunk) => chunk.data));
   const videoOffset = header.byteLength + placeholderMoov.byteLength + 8;
@@ -678,9 +684,12 @@ export function muxAvcOpusMp4(
 }
 
 function validateExportOptions(options: AvcOpusMp4ExportOptions): void {
-  const avcProbe = new Uint8Array([1, 0, 0, 0, 0, 0, 0]);
-  validateMuxConfig(options.width, options.height, options.numberOfChannels, avcProbe);
-
+  validateMuxConfig(
+    options.width,
+    options.height,
+    options.numberOfChannels,
+    new Uint8Array([1, 0, 0, 0, 0, 0, 0]),
+  );
   if (!Number.isFinite(options.frameRate) || options.frameRate <= 0 || options.frameRate > 240) {
     throw new Mp4ExportError("MP4_EXPORT_INVALID_CONFIG", `Invalid frame rate ${options.frameRate}.`);
   }
@@ -711,10 +720,12 @@ function validateExportOptions(options: AvcOpusMp4ExportOptions): void {
 }
 
 function copyDescription(description: AllowSharedBufferSource): Uint8Array {
-  if (description instanceof ArrayBuffer) {
-    return new Uint8Array(description.slice(0));
+  if (ArrayBuffer.isView(description)) {
+    return new Uint8Array(
+      new Uint8Array(description.buffer, description.byteOffset, description.byteLength),
+    );
   }
-  return new Uint8Array(new Uint8Array(description.buffer, description.byteOffset, description.byteLength));
+  return new Uint8Array(description).slice();
 }
 
 export async function exportAvcOpusMp4(options: AvcOpusMp4ExportOptions): Promise<AvcOpusMp4ExportResult> {
@@ -731,13 +742,12 @@ export async function exportAvcOpusMp4(options: AvcOpusMp4ExportOptions): Promis
     );
   }
 
-  const videoBitrate = options.videoBitrate
-    ?? Math.max(300_000, Math.round(options.width * options.height * options.frameRate * 0.12));
   const videoConfig: VideoEncoderConfig = {
     codec: AV_MP4_VIDEO_CODEC,
     width: options.width,
     height: options.height,
-    bitrate: videoBitrate,
+    bitrate: options.videoBitrate
+      ?? Math.max(300_000, Math.round(options.width * options.height * options.frameRate * 0.12)),
     framerate: options.frameRate,
     latencyMode: "realtime",
     avc: { format: "avc" },
@@ -780,9 +790,7 @@ export async function exportAvcOpusMp4(options: AvcOpusMp4ExportOptions): Promis
         data,
       });
       const description = metadata?.decoderConfig?.description;
-      if (description !== undefined && avcC === null) {
-        avcC = copyDescription(description);
-      }
+      if (description !== undefined && avcC === null) avcC = copyDescription(description);
     },
     error: (error) => {
       videoFailure = error;
@@ -818,8 +826,13 @@ export async function exportAvcOpusMp4(options: AvcOpusMp4ExportOptions): Promis
   } finally {
     videoEncoder.close();
   }
-  if (videoFailure !== null) {
-    throw new Mp4ExportError("MP4_EXPORT_VIDEO_ENCODER_FAILED", videoFailure.message, { cause: videoFailure });
+  const finalVideoFailure = videoFailure as Error | null;
+  if (finalVideoFailure !== null) {
+    throw new Mp4ExportError(
+      "MP4_EXPORT_VIDEO_ENCODER_FAILED",
+      finalVideoFailure.message,
+      { cause: finalVideoFailure },
+    );
   }
   if (videoChunks.length === 0 || avcC === null) {
     throw new Mp4ExportError(
@@ -838,7 +851,8 @@ export async function exportAvcOpusMp4(options: AvcOpusMp4ExportOptions): Promis
       chunk.copyTo(data);
       audioChunks.push({
         timestampUs: chunk.timestamp,
-        durationUs: chunk.duration ?? Math.max(1, Math.round((audioChunkFrames * 1_000_000) / AV_MP4_OPUS_SAMPLE_RATE)),
+        durationUs: chunk.duration
+          ?? Math.max(1, Math.round((audioChunkFrames * 1_000_000) / AV_MP4_OPUS_SAMPLE_RATE)),
         data,
       });
     },
@@ -875,8 +889,13 @@ export async function exportAvcOpusMp4(options: AvcOpusMp4ExportOptions): Promis
   } finally {
     audioEncoder.close();
   }
-  if (audioFailure !== null) {
-    throw new Mp4ExportError("MP4_EXPORT_AUDIO_ENCODER_FAILED", audioFailure.message, { cause: audioFailure });
+  const finalAudioFailure = audioFailure as Error | null;
+  if (finalAudioFailure !== null) {
+    throw new Mp4ExportError(
+      "MP4_EXPORT_AUDIO_ENCODER_FAILED",
+      finalAudioFailure.message,
+      { cause: finalAudioFailure },
+    );
   }
   if (audioChunks.length === 0) {
     throw new Mp4ExportError("MP4_EXPORT_AUDIO_ENCODER_FAILED", "Opus encoder produced no chunks.");
@@ -884,9 +903,18 @@ export async function exportAvcOpusMp4(options: AvcOpusMp4ExportOptions): Promis
   audioChunks.sort((left, right) => left.timestampUs - right.timestampUs);
 
   const videoDurationUs = options.frameCount * frameDurationUs;
-  const audioDurationUs = Math.round((options.totalAudioFrames * 1_000_000) / AV_MP4_OPUS_SAMPLE_RATE);
+  const audioDurationUs = Math.round(
+    (options.totalAudioFrames * 1_000_000) / AV_MP4_OPUS_SAMPLE_RATE,
+  );
   return {
-    bytes: muxAvcOpusMp4(options.width, options.height, options.numberOfChannels, avcC, videoChunks, audioChunks),
+    bytes: muxAvcOpusMp4(
+      options.width,
+      options.height,
+      options.numberOfChannels,
+      avcC,
+      videoChunks,
+      audioChunks,
+    ),
     mimeType: AV_MP4_MIME_TYPE,
     videoCodec: AV_MP4_VIDEO_CODEC,
     audioCodec: AV_MP4_AUDIO_CODEC,
