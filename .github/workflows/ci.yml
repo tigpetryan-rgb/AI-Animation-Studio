@@ -52,7 +52,20 @@ jobs:
           bash scripts/package-release-candidate.sh
 
       - name: Verify release candidate checksum
-        run: sha256sum -c release/AI-Animation-Studio-Web-RC.zip.sha256
+        run: |
+          cd release
+          sha256sum -c AI-Animation-Studio-Web-RC.zip.sha256
+
+      - name: Verify extracted release candidate
+        run: |
+          rm -rf /tmp/aistudio-rc-check
+          mkdir -p /tmp/aistudio-rc-check
+          unzip -q release/AI-Animation-Studio-Web-RC.zip -d /tmp/aistudio-rc-check
+          cd /tmp/aistudio-rc-check
+          sha256sum -c studio-web-files.sha256
+          test -f studio-web/index.html
+          test -f studio-web/sw.js
+          node -e 'const fs=require("fs"); const m=JSON.parse(fs.readFileSync("studio-web-release-manifest.json","utf8")); if(m.source.commit!==process.env.AISTUDIO_SOURCE_SHA){throw new Error(`Manifest source mismatch: ${m.source.commit} != ${process.env.AISTUDIO_SOURCE_SHA}`)}'
 
       - name: Upload release candidate artifact
         uses: actions/upload-artifact@v4
