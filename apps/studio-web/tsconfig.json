@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist-types",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+  },
+  "references": [
+    { "path": "../../packages/browser-probe" },
+    { "path": "../../packages/platform-capabilities" },
+    { "path": "../../packages/studio-shell" }
+  ],
+  "include": ["src/**/*.ts"]
+}
