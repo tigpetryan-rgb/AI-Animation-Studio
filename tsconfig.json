@@ -22,6 +22,7 @@
     { "path": "./packages/production-autopilot" },
     { "path": "./packages/security-policy" },
     { "path": "./packages/production-manifest" },
-    { "path": "./packages/production-orchestrator" }
+    { "path": "./packages/production-orchestrator" },
+    { "path": "./apps/studio-web" }
   ]
 }

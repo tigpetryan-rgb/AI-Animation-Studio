@@ -1,0 +1,14 @@
+{
+  "name": "@aistudio/studio-web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@aistudio/browser-probe": "0.0.0",
+    "@aistudio/platform-capabilities": "0.0.0",
+    "@aistudio/studio-shell": "0.0.0"
+  }
+}
