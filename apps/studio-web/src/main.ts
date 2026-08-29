@@ -18,6 +18,11 @@ import {
   serializeDeviceVerificationReport,
   type DeviceVerificationReport,
 } from "./device-check";
+import {
+  runPerformanceBenchmark,
+  serializePerformanceBenchmarkReport,
+  type PerformanceBenchmarkReport,
+} from "./performance-benchmark";
 import { createStudioBootModel } from "./runtime";
 
 function probeWebGl2(): boolean {
@@ -57,6 +62,9 @@ let deviceReport: DeviceVerificationReport | null = null;
 let deviceReportSource: "LIVE" | "IMPORTED" | null = null;
 let deviceReportError: string | null = null;
 let deviceCheckRunning = false;
+let performanceReport: PerformanceBenchmarkReport | null = null;
+let performanceBenchmarkError: string | null = null;
+let performanceBenchmarkRunning = false;
 const root = requireStudioRoot();
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string): HTMLElementTagNameMap[K] {
@@ -131,6 +139,30 @@ function downloadDeviceReport(report: DeviceVerificationReport): void {
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = `aistudio-device-verification-${report.capturedAt.replaceAll(":", "-")}.json`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+async function runBenchmark(): Promise<void> {
+  performanceBenchmarkRunning = true;
+  performanceBenchmarkError = null;
+  render();
+  try {
+    performanceReport = await runPerformanceBenchmark();
+  } catch (error) {
+    performanceBenchmarkError = error instanceof Error ? error.message : "Performance benchmark failed.";
+  } finally {
+    performanceBenchmarkRunning = false;
+    render();
+  }
+}
+
+function downloadPerformanceReport(report: PerformanceBenchmarkReport): void {
+  const blob = new Blob([serializePerformanceBenchmarkReport(report)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `aistudio-performance-benchmark-${report.capturedAt.replaceAll(":", "-")}.json`;
   anchor.click();
   URL.revokeObjectURL(url);
 }
@@ -219,6 +251,74 @@ function renderDeviceVerification(inspector: HTMLElement): void {
   inspector.append(downloadButton, text("p", deviceReport.note, "verification-note"));
 }
 
+function renderPerformanceBenchmark(inspector: HTMLElement): void {
+  inspector.append(text("h3", "Performance benchmark"));
+  inspector.append(
+    text(
+      "p",
+      "Measures this browser session without applying uncalibrated pass/fail speed thresholds.",
+      "verification-note",
+    ),
+  );
+
+  const runButton = el("button", "performance-benchmark-button");
+  runButton.type = "button";
+  runButton.textContent = performanceBenchmarkRunning ? "Benchmarking…" : "Run performance benchmark";
+  runButton.disabled = performanceBenchmarkRunning || deviceCheckRunning;
+  runButton.addEventListener("click", () => void runBenchmark());
+  inspector.append(runButton);
+
+  if (performanceBenchmarkError) {
+    const error = text("p", performanceBenchmarkError, "device-report-error");
+    error.setAttribute("role", "alert");
+    inspector.append(error);
+  }
+
+  if (!performanceReport) return;
+
+  const summary = text(
+    "div",
+    `Benchmark: ${performanceReport.summary}`,
+    `performance-summary performance-${performanceReport.summary.toLowerCase()}`,
+  );
+  summary.dataset.performanceSummary = performanceReport.summary;
+  inspector.append(summary);
+
+  const meta = el("div", "device-report-meta");
+  meta.append(
+    text("span", `Build ${performanceReport.build.commit.slice(0, 12)}`),
+    text("span", new Date(performanceReport.capturedAt).toLocaleString()),
+  );
+  inspector.append(meta);
+
+  const list = el("ul", "performance-measurement-list");
+  for (const measurement of performanceReport.measurements) {
+    const item = el("li", `benchmark-${measurement.status.toLowerCase()}`);
+    item.dataset.benchmarkId = measurement.id;
+    const headline = el("div", "check-headline");
+    headline.append(text("span", measurement.label), text("strong", measurement.status));
+    item.append(headline, text("p", `${measurement.detail} · ${measurement.durationMs} ms`, "muted"));
+
+    const metrics = Object.entries(measurement.metrics);
+    if (metrics.length > 0) {
+      const metricList = el("dl", "benchmark-metrics");
+      for (const [name, value] of metrics) {
+        const metricValue = value === null ? "n/a" : String(value);
+        metricList.append(text("dt", name), text("dd", metricValue));
+      }
+      item.append(metricList);
+    }
+    list.append(item);
+  }
+  inspector.append(list);
+
+  const downloadButton = el("button", "performance-report-download");
+  downloadButton.type = "button";
+  downloadButton.textContent = "Download performance report";
+  downloadButton.addEventListener("click", () => downloadPerformanceReport(performanceReport as PerformanceBenchmarkReport));
+  inspector.append(downloadButton, text("p", performanceReport.note, "verification-note"));
+}
+
 function render(): void {
   root.replaceChildren();
 
@@ -286,6 +386,7 @@ function render(): void {
   }
 
   renderDeviceVerification(inspector);
+  renderPerformanceBenchmark(inspector);
   body.append(assets, viewport, inspector);
 
   const timeline = el("footer", "timeline");
