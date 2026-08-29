@@ -8,6 +8,8 @@
   },
   "dependencies": {
     "@aistudio/browser-probe": "0.0.0",
+    "@aistudio/core-project": "0.0.0",
+    "@aistudio/core-types": "0.0.0",
     "@aistudio/platform-capabilities": "0.0.0",
     "@aistudio/studio-shell": "0.0.0"
   }
