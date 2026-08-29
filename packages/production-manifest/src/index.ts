@@ -154,7 +154,7 @@ export function validateProductionManifest(manifest: ProductionManifest): readon
     diagnostics.push({ code: "MANIFEST_INVALID_REVISION", message: "projectRevision must be a non-negative safe integer.", ref: "projectRevision" });
   }
 
-  const hashes: readonly [string, string][] = [
+  const hashes: readonly (readonly [string, string])[] = [
     ["projectStateSha256", manifest.projectStateSha256],
     ["storyIrSha256", manifest.storyIrSha256],
     ...manifest.assets.map((item) => [`asset:${item.id}`, item.sha256] as const),
@@ -238,7 +238,9 @@ export function reproducibilityPayload(manifest: ProductionManifest): string {
 export async function webCryptoSha256(bytes: Uint8Array): Promise<Uint8Array> {
   const subtle = globalThis.crypto?.subtle;
   if (subtle === undefined) throw new Error("Web Crypto SHA-256 is unavailable in this runtime.");
-  const digest = await subtle.digest("SHA-256", bytes);
+  const copy = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(copy).set(bytes);
+  const digest = await subtle.digest("SHA-256", copy);
   return new Uint8Array(digest);
 }
 
