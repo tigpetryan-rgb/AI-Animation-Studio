@@ -23,6 +23,7 @@
     { "path": "./packages/security-policy" },
     { "path": "./packages/production-manifest" },
     { "path": "./packages/production-orchestrator" },
+    { "path": "./packages/production-runtime" },
     { "path": "./apps/studio-web" }
   ]
 }
