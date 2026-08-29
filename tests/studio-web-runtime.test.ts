@@ -16,7 +16,7 @@ function snapshot(overrides: Partial<BrowserCapabilitySnapshot> = {}): BrowserCa
     sharedArrayBuffer: true,
     offscreenCanvas: true,
     logicalCores: 8,
-    deviceMemoryGB: 8,
+    deviceMemoryGB: 16,
     ...overrides,
   };
 }
