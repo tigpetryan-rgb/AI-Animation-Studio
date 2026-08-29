@@ -15,6 +15,7 @@
     { "path": "./packages/qc-engine" },
     { "path": "./packages/platform-capabilities" },
     { "path": "./packages/studio-shell" },
-    { "path": "./packages/browser-runtime" }
+    { "path": "./packages/browser-runtime" },
+    { "path": "./packages/project-storage" }
   ]
 }
