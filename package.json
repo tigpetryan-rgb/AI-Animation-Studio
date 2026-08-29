@@ -4,16 +4,19 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -b && npm run build:web",
+    "build:web": "vite build apps/studio-web",
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "devDependencies": {
     "typescript": "^5.9.0",
+    "vite": "^7.1.0",
     "vitest": "^3.2.0"
   }
 }
