@@ -1,5 +1,6 @@
 export type DeviceCheckStatus = "PASS" | "FAIL" | "UNAVAILABLE";
 export type DeviceVerificationSummary = "READY" | "DEGRADED" | "FAILED";
+export type DeviceCompatibilityMode = "FULL" | "FALLBACK" | "BLOCKED";
 
 export interface DeviceCheckResult {
   readonly id: string;
@@ -18,6 +19,31 @@ export interface DeviceVerificationReport {
   readonly checks: readonly DeviceCheckResult[];
   readonly note: string;
 }
+
+export type DeviceReportValidation =
+  | { readonly ok: true; readonly report: DeviceVerificationReport }
+  | { readonly ok: false; readonly issues: readonly string[] };
+
+export interface DeviceVerificationIntake {
+  readonly mode: DeviceCompatibilityMode;
+  readonly requiredPassed: number;
+  readonly requiredTotal: number;
+  readonly optionalPassed: number;
+  readonly optionalTotal: number;
+  readonly failedRequired: readonly string[];
+  readonly degradedOptional: readonly string[];
+}
+
+const REQUIRED_CHECK_IDS = [
+  "secure-context",
+  "service-worker",
+  "opfs",
+  "indexeddb",
+  "wasm",
+] as const;
+const OPTIONAL_CHECK_IDS = ["webgpu", "webcodecs"] as const;
+const DEVICE_CHECK_STATUSES = new Set<DeviceCheckStatus>(["PASS", "FAIL", "UNAVAILABLE"]);
+const DEVICE_SUMMARIES = new Set<DeviceVerificationSummary>(["READY", "DEGRADED", "FAILED"]);
 
 interface WritableHandleLike {
   write(data: string): Promise<void>;
@@ -56,10 +82,146 @@ interface VideoEncoderLike {
   }): Promise<CodecSupportResult>;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
 export function summarizeDeviceChecks(checks: readonly DeviceCheckResult[]): DeviceVerificationSummary {
   if (checks.some((check) => check.required && check.status !== "PASS")) return "FAILED";
   if (checks.some((check) => check.status !== "PASS")) return "DEGRADED";
   return "READY";
+}
+
+export function validateDeviceVerificationReport(input: unknown): DeviceReportValidation {
+  const issues: string[] = [];
+  if (!isRecord(input)) return { ok: false, issues: ["Report root must be a JSON object."] };
+
+  if (input.schemaVersion !== 1) issues.push("schemaVersion must equal 1.");
+  if (!isNonEmptyString(input.capturedAt) || Number.isNaN(Date.parse(input.capturedAt))) {
+    issues.push("capturedAt must be a valid date/time string.");
+  }
+  if (!isNonEmptyString(input.userAgent)) issues.push("userAgent must be a non-empty string.");
+  if (!DEVICE_SUMMARIES.has(input.summary as DeviceVerificationSummary)) {
+    issues.push("summary must be READY, DEGRADED or FAILED.");
+  }
+  if (typeof input.note !== "string") issues.push("note must be a string.");
+  if (!Array.isArray(input.checks)) {
+    issues.push("checks must be an array.");
+    return { ok: false, issues };
+  }
+
+  const checks: DeviceCheckResult[] = [];
+  const seenIds = new Set<string>();
+  input.checks.forEach((rawCheck, index) => {
+    if (!isRecord(rawCheck)) {
+      issues.push(`checks[${index}] must be an object.`);
+      return;
+    }
+
+    const id = rawCheck.id;
+    const label = rawCheck.label;
+    const required = rawCheck.required;
+    const status = rawCheck.status;
+    const detail = rawCheck.detail;
+    const durationMs = rawCheck.durationMs;
+
+    if (!isNonEmptyString(id)) issues.push(`checks[${index}].id must be a non-empty string.`);
+    if (!isNonEmptyString(label)) issues.push(`checks[${index}].label must be a non-empty string.`);
+    if (typeof required !== "boolean") issues.push(`checks[${index}].required must be boolean.`);
+    if (!DEVICE_CHECK_STATUSES.has(status as DeviceCheckStatus)) {
+      issues.push(`checks[${index}].status must be PASS, FAIL or UNAVAILABLE.`);
+    }
+    if (typeof detail !== "string") issues.push(`checks[${index}].detail must be a string.`);
+    if (typeof durationMs !== "number" || !Number.isFinite(durationMs) || durationMs < 0) {
+      issues.push(`checks[${index}].durationMs must be a finite non-negative number.`);
+    }
+
+    if (isNonEmptyString(id)) {
+      if (seenIds.has(id)) issues.push(`Duplicate check id: ${id}.`);
+      seenIds.add(id);
+    }
+
+    if (
+      isNonEmptyString(id)
+      && isNonEmptyString(label)
+      && typeof required === "boolean"
+      && DEVICE_CHECK_STATUSES.has(status as DeviceCheckStatus)
+      && typeof detail === "string"
+      && typeof durationMs === "number"
+      && Number.isFinite(durationMs)
+      && durationMs >= 0
+    ) {
+      checks.push({ id, label, required, status: status as DeviceCheckStatus, detail, durationMs });
+    }
+  });
+
+  for (const id of REQUIRED_CHECK_IDS) {
+    const check = checks.find((candidate) => candidate.id === id);
+    if (!check) issues.push(`Missing required canonical check: ${id}.`);
+    else if (!check.required) issues.push(`Canonical check ${id} must be marked required=true.`);
+  }
+  for (const id of OPTIONAL_CHECK_IDS) {
+    const check = checks.find((candidate) => candidate.id === id);
+    if (!check) issues.push(`Missing optional canonical check: ${id}.`);
+    else if (check.required) issues.push(`Canonical check ${id} must be marked required=false.`);
+  }
+
+  if (checks.length > 0 && DEVICE_SUMMARIES.has(input.summary as DeviceVerificationSummary)) {
+    const computed = summarizeDeviceChecks(checks);
+    if (computed !== input.summary) {
+      issues.push(`summary does not match checks: expected ${computed}, received ${String(input.summary)}.`);
+    }
+  }
+
+  if (issues.length > 0) return { ok: false, issues };
+
+  return {
+    ok: true,
+    report: {
+      schemaVersion: 1,
+      capturedAt: input.capturedAt as string,
+      userAgent: input.userAgent as string,
+      summary: input.summary as DeviceVerificationSummary,
+      checks,
+      note: input.note as string,
+    },
+  };
+}
+
+export function parseDeviceVerificationReport(json: string): DeviceReportValidation {
+  try {
+    return validateDeviceVerificationReport(JSON.parse(json) as unknown);
+  } catch (error) {
+    return {
+      ok: false,
+      issues: [error instanceof Error ? `Invalid JSON: ${error.message}` : "Invalid JSON."],
+    };
+  }
+}
+
+export function analyzeDeviceVerificationReport(report: DeviceVerificationReport): DeviceVerificationIntake {
+  const required = REQUIRED_CHECK_IDS.map((id) => report.checks.find((check) => check.id === id)).filter(
+    (check): check is DeviceCheckResult => check !== undefined,
+  );
+  const optional = OPTIONAL_CHECK_IDS.map((id) => report.checks.find((check) => check.id === id)).filter(
+    (check): check is DeviceCheckResult => check !== undefined,
+  );
+  const failedRequired = required.filter((check) => check.status !== "PASS").map((check) => check.id);
+  const degradedOptional = optional.filter((check) => check.status !== "PASS").map((check) => check.id);
+
+  return {
+    mode: failedRequired.length > 0 ? "BLOCKED" : degradedOptional.length > 0 ? "FALLBACK" : "FULL",
+    requiredPassed: required.filter((check) => check.status === "PASS").length,
+    requiredTotal: REQUIRED_CHECK_IDS.length,
+    optionalPassed: optional.filter((check) => check.status === "PASS").length,
+    optionalTotal: OPTIONAL_CHECK_IDS.length,
+    failedRequired,
+    degradedOptional,
+  };
 }
 
 async function measure(
