@@ -64,7 +64,7 @@ const manifest = {
   artifactType: "studio-web-release-candidate",
   source: {
     repository: process.env.GITHUB_REPOSITORY ?? null,
-    commit: process.env.GITHUB_SHA ?? process.env.AISTUDIO_SOURCE_SHA ?? null,
+    commit: process.env.AISTUDIO_SOURCE_SHA ?? process.env.GITHUB_SHA ?? null,
     sourceDate: sourceDate(),
   },
   build: {
