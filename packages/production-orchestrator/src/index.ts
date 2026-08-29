@@ -112,11 +112,15 @@ const STAGES: readonly ProductionStage[] = Object.freeze([
   "APPROVED",
 ]);
 
+function gateList(...values: ProductionGateKind[]): readonly ProductionGateKind[] {
+  return Object.freeze(values);
+}
+
 const REQUIRED_GATES: Readonly<Partial<Record<ProductionStage, readonly ProductionGateKind[]>>> = Object.freeze({
-  BLOCKED: Object.freeze(["STORY", "BLOCKING"]),
-  REHEARSED: Object.freeze(["BLOCKING"]),
-  PERFORMANCE_VALID: Object.freeze(["PERFORMANCE", "CONTACT_IK", "PHYSICS"]),
-  READY_FOR_RENDER: Object.freeze([
+  BLOCKED: gateList("STORY", "BLOCKING"),
+  REHEARSED: gateList("BLOCKING"),
+  PERFORMANCE_VALID: gateList("PERFORMANCE", "CONTACT_IK", "PHYSICS"),
+  READY_FOR_RENDER: gateList(
     "STORY",
     "BLOCKING",
     "PERFORMANCE",
@@ -124,7 +128,7 @@ const REQUIRED_GATES: Readonly<Partial<Record<ProductionStage, readonly Producti
     "PHYSICS",
     "CAMERA_VISIBILITY",
     "CONTINUITY",
-  ]),
+  ),
 });
 
 export interface ProductionOrchestratorEvidence {
