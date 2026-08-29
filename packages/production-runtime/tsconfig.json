@@ -7,6 +7,7 @@
   "references": [
     { "path": "../core-events" },
     { "path": "../core-project" },
+    { "path": "../core-types" },
     { "path": "../production-autopilot" },
     { "path": "../production-manifest" },
     { "path": "../production-orchestrator" },
