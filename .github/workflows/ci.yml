@@ -23,6 +23,16 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Capture canonical source identity
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          SOURCE_SHA="${PR_HEAD_SHA:-$GITHUB_SHA}"
+          SOURCE_DATE="$(git show -s --format=%cI "${SOURCE_SHA}")"
+          echo "AISTUDIO_SOURCE_SHA=${SOURCE_SHA}" >> "$GITHUB_ENV"
+          echo "AISTUDIO_SOURCE_DATE=${SOURCE_DATE}" >> "$GITHUB_ENV"
+          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "${SOURCE_SHA}")" >> "$GITHUB_ENV"
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -37,14 +47,6 @@ jobs:
 
       - name: Browser smoke
         run: npm run test:browser
-
-      - name: Capture canonical source identity
-        env:
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          SOURCE_SHA="${PR_HEAD_SHA:-$GITHUB_SHA}"
-          echo "AISTUDIO_SOURCE_SHA=${SOURCE_SHA}" >> "$GITHUB_ENV"
-          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "${SOURCE_SHA}")" >> "$GITHUB_ENV"
 
       - name: Build release candidate package
         run: |
@@ -66,6 +68,7 @@ jobs:
           test -f studio-web/index.html
           test -f studio-web/sw.js
           node -e 'const fs=require("fs"); const m=JSON.parse(fs.readFileSync("studio-web-release-manifest.json","utf8")); if(m.source.commit!==process.env.AISTUDIO_SOURCE_SHA){throw new Error(`Manifest source mismatch: ${m.source.commit} != ${process.env.AISTUDIO_SOURCE_SHA}`)}'
+          grep -q "${AISTUDIO_SOURCE_SHA}" studio-web/assets/*.js
 
       - name: Upload release candidate artifact
         uses: actions/upload-artifact@v4

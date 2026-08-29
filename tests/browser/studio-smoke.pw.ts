@@ -10,7 +10,16 @@ async function waitForServiceWorkerControl(page: Page): Promise<void> {
   });
 }
 
-function importedReport(options: { omitOpfs?: boolean } = {}): string {
+async function currentBuildCommit(page: Page): Promise<string> {
+  const commit = await page.locator("[data-studio-build-commit]").getAttribute("data-studio-build-commit");
+  if (!commit) throw new Error("Studio build commit is unavailable in the Runtime inspector.");
+  return commit;
+}
+
+function importedReport(
+  buildCommit: string,
+  options: { omitOpfs?: boolean } = {},
+): string {
   const checks = [
     { id: "secure-context", label: "Secure Context", required: true, status: "PASS", detail: "ok", durationMs: 1 },
     { id: "service-worker", label: "Service Worker", required: true, status: "PASS", detail: "ok", durationMs: 1 },
@@ -22,9 +31,14 @@ function importedReport(options: { omitOpfs?: boolean } = {}): string {
   ].filter((check) => !(options.omitOpfs && check.id === "opfs"));
 
   return JSON.stringify({
-    schemaVersion: 1,
+    schemaVersion: 2,
+    build: {
+      repository: "tigpetryan-rgb/AI-Animation-Studio",
+      commit: buildCommit,
+      sourceDate: "2026-08-29T11:00:00.000Z",
+    },
     capturedAt: "2026-08-29T11:00:00.000Z",
-    userAgent: "M22 imported Android browser report",
+    userAgent: "M23 imported Android browser report",
     summary: "READY",
     checks,
     note: "Imported test evidence",
@@ -37,6 +51,9 @@ test("Studio boots and accepts real UI interactions", async ({ page }) => {
   await expect(page).toHaveTitle("AI Animation Studio");
   await expect(page.getByText("AI Animation Studio", { exact: true })).toBeVisible();
   await expect(page.getByText("Production viewport")).toBeVisible();
+
+  const buildCommit = await currentBuildCommit(page);
+  expect(buildCommit).toMatch(/^[0-9a-f]{40}$/);
 
   await page.getByRole("button", { name: "QC", exact: true }).click();
   await expect(page.locator(".eyebrow")).toHaveText("QC");
@@ -82,7 +99,6 @@ test("installed shell reloads while Chromium is offline", async ({ page, context
   await page.goto("/");
   await waitForServiceWorkerControl(page);
 
-  // Reload once while controlled so versioned Vite assets are captured by the same-origin cache.
   await page.reload();
   await expect(page.getByText("Production viewport")).toBeVisible();
 
@@ -96,8 +112,9 @@ test("installed shell reloads while Chromium is offline", async ({ page, context
   }
 });
 
-test("Studio produces a real device verification report", async ({ page }) => {
+test("Studio produces a real device verification report bound to its build", async ({ page }) => {
   await page.goto("/");
+  const buildCommit = await currentBuildCommit(page);
   await page.getByRole("button", { name: "Run device check" }).click();
 
   const summary = page.locator(".device-summary");
@@ -109,32 +126,54 @@ test("Studio produces a real device verification report", async ({ page }) => {
   await expect(page.locator('[data-check-id="opfs"] strong')).toHaveText("PASS");
   await expect(page.locator('[data-check-id="indexeddb"] strong')).toHaveText("PASS");
   await expect(page.locator('[data-check-id="wasm"] strong')).toHaveText("PASS");
+  await expect(page.getByText(`Build ${buildCommit.slice(0, 12)}`, { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Download verification report" })).toBeVisible();
 });
 
-test("Studio imports and classifies a valid external device report", async ({ page }) => {
+test("Studio imports and classifies a valid report from the same build", async ({ page }) => {
   await page.goto("/");
+  const buildCommit = await currentBuildCommit(page);
   await page.locator('input[data-device-report-input="true"]').setInputFiles({
     name: "android-device-report.json",
     mimeType: "application/json",
-    buffer: Buffer.from(importedReport()),
+    buffer: Buffer.from(importedReport(buildCommit)),
   });
 
   await expect(page.getByText("Imported report", { exact: true })).toBeVisible();
   await expect(page.locator('[data-compatibility-mode="FULL"]')).toHaveText("Compatibility: FULL");
+  await expect(page.getByText(`Build ${buildCommit.slice(0, 12)}`, { exact: true })).toBeVisible();
   await expect(page.getByText("Required 5/5", { exact: true })).toBeVisible();
   await expect(page.getByText("Optional 2/2", { exact: true })).toBeVisible();
-  await expect(page.getByText("M22 imported Android browser report", { exact: true })).toBeVisible();
+  await expect(page.getByText("M23 imported Android browser report", { exact: true })).toBeVisible();
 });
 
 test("Studio rejects an incomplete imported device report", async ({ page }) => {
   await page.goto("/");
+  const buildCommit = await currentBuildCommit(page);
   await page.locator('input[data-device-report-input="true"]').setInputFiles({
     name: "invalid-device-report.json",
     mimeType: "application/json",
-    buffer: Buffer.from(importedReport({ omitOpfs: true })),
+    buffer: Buffer.from(importedReport(buildCommit, { omitOpfs: true })),
   });
 
   await expect(page.getByRole("alert")).toContainText("Missing required canonical check: opfs.");
+  await expect(page.locator(".compatibility-mode")).toHaveCount(0);
+});
+
+test("Studio rejects device evidence produced by a different build", async ({ page }) => {
+  await page.goto("/");
+  const buildCommit = await currentBuildCommit(page);
+  const mismatchedCommit =
+    buildCommit === "3333333333333333333333333333333333333333"
+      ? "4444444444444444444444444444444444444444"
+      : "3333333333333333333333333333333333333333";
+
+  await page.locator('input[data-device-report-input="true"]').setInputFiles({
+    name: "wrong-build-device-report.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(importedReport(mismatchedCommit)),
+  });
+
+  await expect(page.getByRole("alert")).toContainText("does not match running Studio build");
   await expect(page.locator(".compatibility-mode")).toHaveCount(0);
 });

@@ -12,6 +12,7 @@ import {
 } from "@aistudio/studio-shell";
 import {
   analyzeDeviceVerificationReport,
+  currentStudioBuildIdentity,
   parseDeviceVerificationReport,
   runBrowserDeviceVerification,
   serializeDeviceVerificationReport,
@@ -50,6 +51,7 @@ const evidence = probeWithEvidence(
   safeBrowserFeatureProbes({ webgl2: probeWebGl2, wasmSimd: probeWasmSimd }),
 );
 const boot = createStudioBootModel(evidence.snapshot);
+const studioBuild = currentStudioBuildIdentity();
 let shellState: StudioShellState = boot.shell;
 let deviceReport: DeviceVerificationReport | null = null;
 let deviceReportSource: "LIVE" | "IMPORTED" | null = null;
@@ -110,7 +112,7 @@ async function runDeviceCheck(): Promise<void> {
 }
 
 async function importDeviceReport(file: File): Promise<void> {
-  const validation = parseDeviceVerificationReport(await file.text());
+  const validation = parseDeviceVerificationReport(await file.text(), studioBuild);
   if (!validation.ok) {
     deviceReportError = validation.issues.join(" ");
     render();
@@ -187,6 +189,7 @@ function renderDeviceVerification(inspector: HTMLElement): void {
   const meta = el("div", "device-report-meta");
   meta.append(
     text("span", deviceReportSource === "IMPORTED" ? "Imported report" : "Live browser"),
+    text("span", `Build ${deviceReport.build.commit.slice(0, 12)}`),
     text("span", new Date(deviceReport.capturedAt).toLocaleString()),
   );
   inspector.append(meta);
@@ -258,6 +261,13 @@ function render(): void {
 
   const inspector = el("aside", "panel inspector");
   inspector.append(text("h2", "Runtime"));
+
+  const buildRow = el("div", "kv-row studio-build-row");
+  buildRow.dataset.studioBuildCommit = studioBuild.commit;
+  buildRow.dataset.studioBuildSourceDate = studioBuild.sourceDate;
+  buildRow.append(text("span", "Build"), text("strong", studioBuild.commit.slice(0, 12)));
+  inspector.append(buildRow);
+
   for (const [label, value] of capabilityRows()) {
     const row = el("div", "kv-row");
     row.append(text("span", label), text("strong", value));
