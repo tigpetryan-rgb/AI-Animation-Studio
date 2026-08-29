@@ -84,7 +84,7 @@ await writeFile(
 );
 await writeFile(
   path.join(releaseRoot, "studio-web-files.sha256"),
-  `${files.map((file) => `${file.sha256}  ${file.path}`).join("\n")}\n`,
+  `${files.map((file) => `${file.sha256}  studio-web/${file.path}`).join("\n")}\n`,
   "utf8",
 );
 
