@@ -10,6 +10,27 @@ async function waitForServiceWorkerControl(page: Page): Promise<void> {
   });
 }
 
+function importedReport(options: { omitOpfs?: boolean } = {}): string {
+  const checks = [
+    { id: "secure-context", label: "Secure Context", required: true, status: "PASS", detail: "ok", durationMs: 1 },
+    { id: "service-worker", label: "Service Worker", required: true, status: "PASS", detail: "ok", durationMs: 1 },
+    { id: "opfs", label: "OPFS", required: true, status: "PASS", detail: "ok", durationMs: 1 },
+    { id: "indexeddb", label: "IndexedDB", required: true, status: "PASS", detail: "ok", durationMs: 1 },
+    { id: "wasm", label: "WebAssembly", required: true, status: "PASS", detail: "ok", durationMs: 1 },
+    { id: "webgpu", label: "WebGPU Adapter", required: false, status: "PASS", detail: "ok", durationMs: 1 },
+    { id: "webcodecs", label: "WebCodecs VP8", required: false, status: "PASS", detail: "ok", durationMs: 1 },
+  ].filter((check) => !(options.omitOpfs && check.id === "opfs"));
+
+  return JSON.stringify({
+    schemaVersion: 1,
+    capturedAt: "2026-08-29T11:00:00.000Z",
+    userAgent: "M22 imported Android browser report",
+    summary: "READY",
+    checks,
+    note: "Imported test evidence",
+  });
+}
+
 test("Studio boots and accepts real UI interactions", async ({ page }) => {
   await page.goto("/");
 
@@ -89,4 +110,31 @@ test("Studio produces a real device verification report", async ({ page }) => {
   await expect(page.locator('[data-check-id="indexeddb"] strong')).toHaveText("PASS");
   await expect(page.locator('[data-check-id="wasm"] strong')).toHaveText("PASS");
   await expect(page.getByRole("button", { name: "Download verification report" })).toBeVisible();
+});
+
+test("Studio imports and classifies a valid external device report", async ({ page }) => {
+  await page.goto("/");
+  await page.locator('input[data-device-report-input="true"]').setInputFiles({
+    name: "android-device-report.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(importedReport()),
+  });
+
+  await expect(page.getByText("Imported report", { exact: true })).toBeVisible();
+  await expect(page.locator('[data-compatibility-mode="FULL"]')).toHaveText("Compatibility: FULL");
+  await expect(page.getByText("Required 5/5", { exact: true })).toBeVisible();
+  await expect(page.getByText("Optional 2/2", { exact: true })).toBeVisible();
+  await expect(page.getByText("M22 imported Android browser report", { exact: true })).toBeVisible();
+});
+
+test("Studio rejects an incomplete imported device report", async ({ page }) => {
+  await page.goto("/");
+  await page.locator('input[data-device-report-input="true"]').setInputFiles({
+    name: "invalid-device-report.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(importedReport({ omitOpfs: true })),
+  });
+
+  await expect(page.getByRole("alert")).toContainText("Missing required canonical check: opfs.");
+  await expect(page.locator(".compatibility-mode")).toHaveCount(0);
 });
