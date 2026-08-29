@@ -16,6 +16,7 @@
     { "path": "./packages/platform-capabilities" },
     { "path": "./packages/studio-shell" },
     { "path": "./packages/browser-runtime" },
-    { "path": "./packages/project-storage" }
+    { "path": "./packages/project-storage" },
+    { "path": "./packages/browser-probe" }
   ]
 }
