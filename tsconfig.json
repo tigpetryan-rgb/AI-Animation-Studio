@@ -11,6 +11,7 @@
     { "path": "./packages/timeline-engine" },
     { "path": "./packages/continuity-engine" },
     { "path": "./packages/performance-engine" },
-    { "path": "./packages/ai-runtime" }
+    { "path": "./packages/ai-runtime" },
+    { "path": "./packages/qc-engine" }
   ]
 }
