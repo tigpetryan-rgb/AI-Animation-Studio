@@ -20,10 +20,20 @@ test("canonical StudioProject survives reload and offline reload", async ({ page
   await page.getByRole("button", { name: "Verify persisted project" }).click();
   await expect(page.locator('[data-persistence-summary="VERIFIED"]')).toBeVisible({ timeout: 15_000 });
 
-  // Playwright's context offline mode is the authoritative network-control evidence here.
-  // navigator.onLine is only a browser hint and can remain true even when requests are blocked.
+  // Playwright's context offline mode controls actual network transport. navigator.onLine is
+  // intentionally not used as evidence because Chromium can keep that advisory hint set to true.
   await context.setOffline(true);
   try {
+    const networkBlocked = await page.evaluate(async () => {
+      try {
+        await fetch(`/__m26_network_probe__?nonce=${Date.now()}`, { cache: "no-store" });
+        return false;
+      } catch {
+        return true;
+      }
+    });
+    expect(networkBlocked).toBe(true);
+
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.getByText("AI Animation Studio", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Verify persisted project" }).click();
