@@ -20,6 +20,8 @@ test("canonical StudioProject survives reload and offline reload", async ({ page
   await page.getByRole("button", { name: "Verify persisted project" }).click();
   await expect(page.locator('[data-persistence-summary="VERIFIED"]')).toBeVisible({ timeout: 15_000 });
 
+  // Playwright's context offline mode is the authoritative network-control evidence here.
+  // navigator.onLine is only a browser hint and can remain true even when requests are blocked.
   await context.setOffline(true);
   try {
     await page.reload({ waitUntil: "domcontentloaded" });
@@ -27,8 +29,10 @@ test("canonical StudioProject survives reload and offline reload", async ({ page
     await page.getByRole("button", { name: "Verify persisted project" }).click();
     const offlineVerified = page.locator('[data-persistence-summary="VERIFIED"]');
     await expect(offlineVerified).toBeVisible({ timeout: 15_000 });
-    await expect(offlineVerified).toHaveAttribute("data-persistence-online", "false");
     await expect(page.locator('[data-persistence-project-id="project_m26_persistence_stress"]')).toBeVisible();
+    await expect(page.locator('[data-persistence-check-id="opfs-digest"] strong')).toHaveText("PASS");
+    await expect(page.locator('[data-persistence-check-id="canonical-deserialize"] strong')).toHaveText("PASS");
+    await expect(page.locator('[data-persistence-check-id="idb-commit-pointer"] strong')).toHaveText("PASS");
   } finally {
     await context.setOffline(false);
   }
