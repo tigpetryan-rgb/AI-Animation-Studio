@@ -55,8 +55,8 @@ export interface SampledTimelineClip<TAsset extends MovieTimelineAsset> {
 }
 
 export interface MovieTimelineSample {
-  readonly video?: SampledTimelineClip<MovieVideoAsset>;
-  readonly audio?: SampledTimelineClip<MovieAudioAsset>;
+  readonly video: SampledTimelineClip<MovieVideoAsset> | undefined;
+  readonly audio: SampledTimelineClip<MovieAudioAsset> | undefined;
 }
 
 function seconds(time: RationalTime): number {
