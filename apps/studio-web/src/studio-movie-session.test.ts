@@ -13,29 +13,34 @@ describe("Studio movie session", () => {
     expect(session.project.projectId).toBe("local-demo-project");
     expect(movieDurationSeconds(session)).toBe(4);
     expect(session.timeline.tracks.map((track) => track.kind)).toEqual(["video", "audio"]);
+    expect(Object.values(session.assets).map((asset) => asset.mediaType).sort()).toEqual([
+      "audio",
+      "audio",
+      "image",
+      "video",
+    ]);
   });
 
-  it("samples the first timeline clip with a real image media binding", () => {
+  it("samples decoded-media descriptors through the timeline engine", () => {
     const session = createLocalDemoMovieSession();
     const sample = sampleMovieTimeline(session, rationalTime(1n, 1n));
     expect(sample.video?.clip.id).toBe("opening-shot");
-    expect(sample.video?.asset.label).toBe("Opening shot");
     expect(sample.video?.asset.mediaType).toBe("image");
-    expect(sample.video?.asset.uri).toBe("./demo-media/opening-shot.svg");
     expect(rationalSeconds(sample.video!.sourceTime)).toBe(1);
     expect(sample.audio?.clip.id).toBe("opening-audio");
-    expect(sample.audio?.asset.frequencyHz).toBe(330);
+    expect(sample.audio?.asset.mediaType).toBe("audio");
+    expect(sample.audio?.asset.mimeType).toBe("audio/ogg");
   });
 
-  it("honors clip source-in offsets after the edit point", () => {
+  it("honors source-in offsets for real video and audio assets after the edit point", () => {
     const session = createLocalDemoMovieSession();
     const sample = sampleMovieTimeline(session, rationalTime(5n, 2n));
     expect(sample.video?.clip.id).toBe("action-shot");
-    expect(sample.video?.asset.label).toBe("Action shot");
-    expect(sample.video?.asset.uri).toBe("./demo-media/action-shot.svg");
-    expect(sample.video?.asset.pan).toBe("right-to-left");
+    expect(sample.video?.asset.mediaType).toBe("video");
+    expect(sample.video?.asset.mimeType).toBe("video/webm");
     expect(rationalSeconds(sample.video!.sourceTime)).toBe(1);
     expect(sample.audio?.clip.id).toBe("action-audio");
+    expect(sample.audio?.asset.mediaType).toBe("audio");
     expect(rationalSeconds(sample.audio!.sourceTime)).toBe(0.75);
   });
 });
