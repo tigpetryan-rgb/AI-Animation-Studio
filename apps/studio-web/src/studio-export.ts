@@ -1,5 +1,6 @@
 import { rationalTime } from "@aistudio/core-time";
 import { exportAvcOpusMp4 } from "@aistudio/media-export/mp4";
+import { prepareMovieMedia, type PreparedMovieMedia } from "./studio-media-assets";
 import {
   movieDurationSeconds,
   movieSessionForProjectId,
@@ -20,7 +21,7 @@ interface ExportPanelState {
 let state: ExportPanelState = {
   phase: "IDLE",
   progress: 0,
-  message: "Open the local demo project to export its timeline.",
+  message: "Open the local demo project to export its timeline media.",
 };
 let syncQueued = false;
 
@@ -69,9 +70,59 @@ function updateState(next: Partial<ExportPanelState>): void {
   syncExportPanel();
 }
 
+function normalizedLoop(seconds: number, periodSeconds: number): number {
+  if (periodSeconds <= 0) return 0;
+  const remainder = seconds % periodSeconds;
+  return (remainder < 0 ? remainder + periodSeconds : remainder) / periodSeconds;
+}
+
+function drawDecodedImage(
+  context: OffscreenCanvasRenderingContext2D,
+  image: ImageBitmap,
+  width: number,
+  height: number,
+  sourceSeconds: number,
+  pan: "left-to-right" | "right-to-left",
+): void {
+  const targetAspect = width / height;
+  const sourceAspect = image.width / image.height;
+  let baseCropWidth: number;
+  let baseCropHeight: number;
+
+  if (sourceAspect >= targetAspect) {
+    baseCropHeight = image.height;
+    baseCropWidth = baseCropHeight * targetAspect;
+  } else {
+    baseCropWidth = image.width;
+    baseCropHeight = baseCropWidth / targetAspect;
+  }
+
+  const zoom = 1.08;
+  const cropWidth = baseCropWidth / zoom;
+  const cropHeight = baseCropHeight / zoom;
+  const maxX = Math.max(0, image.width - cropWidth);
+  const maxY = Math.max(0, image.height - cropHeight);
+  const phase = normalizedLoop(sourceSeconds, 2);
+  const sx = pan === "left-to-right" ? maxX * phase : maxX * (1 - phase);
+  const sy = maxY / 2;
+
+  context.drawImage(
+    image,
+    sx,
+    sy,
+    cropWidth,
+    cropHeight,
+    0,
+    0,
+    width,
+    height,
+  );
+}
+
 function drawTimelineFrame(
   context: OffscreenCanvasRenderingContext2D,
   session: StudioMovieSession,
+  media: PreparedMovieMedia,
   sample: MovieTimelineSample,
   timelineSeconds: number,
   durationSeconds: number,
@@ -84,41 +135,32 @@ function drawTimelineFrame(
     return;
   }
 
+  const image = media.images.get(video.asset.id);
+  if (image === undefined) throw new Error(`Decoded image asset ${video.asset.id} is unavailable.`);
+
   const sourceSeconds = rationalSeconds(video.sourceTime);
-  context.fillStyle = video.asset.background;
-  context.fillRect(0, 0, width, height);
+  drawDecodedImage(context, image, width, height, sourceSeconds, video.asset.pan);
 
-  context.fillStyle = "rgb(239, 243, 250)";
-  context.font = "bold 20px sans-serif";
-  context.fillText(video.asset.label, 20, 34);
-  context.font = "12px sans-serif";
-  context.fillText(`clip ${video.clip.id}`, 20, 54);
-  context.fillText(`source ${sourceSeconds.toFixed(2)}s`, 20, 70);
-
-  context.fillStyle = video.asset.accent;
-  if (video.asset.motion === "left-to-right") {
-    const span = Math.max(1, width - 76);
-    const x = 24 + Math.round((sourceSeconds % 2) / 2 * span);
-    context.fillRect(x, 92, 44, 44);
-  } else {
-    const angle = sourceSeconds * Math.PI;
-    const centerX = width * 0.68;
-    const centerY = height * 0.58;
-    const x = centerX + Math.cos(angle) * 42;
-    const y = centerY + Math.sin(angle) * 24;
-    context.beginPath();
-    context.arc(x, y, 18, 0, Math.PI * 2);
-    context.fill();
-  }
+  context.fillStyle = "rgba(5, 8, 14, 0.68)";
+  context.fillRect(12, 12, 178, 60);
+  context.fillStyle = "rgb(248, 250, 252)";
+  context.font = "bold 14px sans-serif";
+  context.fillText(video.asset.label, 20, 32);
+  context.font = "11px sans-serif";
+  context.fillText(`clip ${video.clip.id}`, 20, 49);
+  context.fillText(`decoded image · source ${sourceSeconds.toFixed(2)}s`, 20, 64);
 
   const progress = durationSeconds <= 0 ? 0 : Math.min(1, timelineSeconds / durationSeconds);
-  context.fillStyle = "rgba(255,255,255,0.22)";
-  context.fillRect(20, height - 24, width - 40, 6);
-  context.fillStyle = video.asset.accent;
-  context.fillRect(20, height - 24, Math.round((width - 40) * progress), 6);
-  context.fillStyle = "rgb(239, 243, 250)";
+  context.fillStyle = "rgba(255,255,255,0.24)";
+  context.fillRect(20, height - 22, width - 40, 5);
+  context.fillStyle = "rgba(255,255,255,0.92)";
+  context.fillRect(20, height - 22, Math.round((width - 40) * progress), 5);
   context.font = "11px monospace";
-  context.fillText(`${timelineSeconds.toFixed(2)} / ${durationSeconds.toFixed(2)}s`, 20, height - 34);
+  context.fillText(`${timelineSeconds.toFixed(2)} / ${durationSeconds.toFixed(2)}s`, 20, height - 32);
+}
+
+function mediaAssetCount(session: StudioMovieSession): number {
+  return Object.values(session.assets).filter((asset) => asset.kind === "video" && asset.mediaType === "image").length;
 }
 
 function timelineSummary(session: StudioMovieSession): string {
@@ -128,7 +170,7 @@ function timelineSummary(session: StudioMovieSession): string {
   const audioClips = session.timeline.tracks
     .filter((track) => track.kind === "audio")
     .reduce((sum, track) => sum + track.clips.length, 0);
-  return `Timeline ${session.timeline.id} · ${movieDurationSeconds(session).toFixed(1)}s · ${videoClips} video clips · ${audioClips} audio clips`;
+  return `Timeline ${session.timeline.id} · ${movieDurationSeconds(session).toFixed(1)}s · ${videoClips} video clips · ${audioClips} audio clips · ${mediaAssetCount(session)} image assets`;
 }
 
 async function exportMovieTimeline(session: StudioMovieSession): Promise<void> {
@@ -137,6 +179,7 @@ async function exportMovieTimeline(session: StudioMovieSession): Promise<void> {
   const durationSeconds = movieDurationSeconds(session);
   const frameCount = Math.ceil(durationSeconds * frameRate);
   const totalAudioFrames = Math.ceil(durationSeconds * sampleRate);
+  let preparedMedia: PreparedMovieMedia | undefined;
 
   updateState({
     phase: "RUNNING",
@@ -149,10 +192,15 @@ async function exportMovieTimeline(session: StudioMovieSession): Promise<void> {
       throw new Error("OffscreenCanvas is unavailable in this browser.");
     }
 
+    updateState({ progress: 3, message: `Decoding ${mediaAssetCount(session)} image assets…` });
+    preparedMedia = await prepareMovieMedia(session);
+    updateState({ progress: 6, message: `Decoded ${preparedMedia.images.size} image assets. Preparing encoder…` });
+
     const canvas = new OffscreenCanvas(width, height);
     const context = canvas.getContext("2d");
     if (context === null) throw new Error("2D canvas context is unavailable.");
 
+    const media = preparedMedia;
     const exported = await exportAvcOpusMp4({
       width,
       height,
@@ -167,14 +215,14 @@ async function exportMovieTimeline(session: StudioMovieSession): Promise<void> {
         const timelineTime = rationalTime(BigInt(index), BigInt(frameRate));
         const sample = sampleMovieTimeline(session, timelineTime);
         const timelineSeconds = rationalSeconds(timelineTime);
-        drawTimelineFrame(context, session, sample, timelineSeconds, durationSeconds);
+        drawTimelineFrame(context, session, media, sample, timelineSeconds, durationSeconds);
 
         const videoProgress = (index + 1) / frameCount;
         updateState({
-          progress: Math.max(state.progress, Math.round(videoProgress * 70)),
+          progress: Math.max(state.progress, 6 + Math.round(videoProgress * 64)),
           message: sample.video === undefined
             ? `Encoding timeline gap… ${index + 1}/${frameCount}`
-            : `Encoding ${sample.video.clip.id}… ${index + 1}/${frameCount}`,
+            : `Compositing ${sample.video.asset.label}… ${index + 1}/${frameCount}`,
         });
         return new VideoFrame(canvas, { timestamp: timestampUs, duration: durationUs });
       },
@@ -212,7 +260,7 @@ async function exportMovieTimeline(session: StudioMovieSession): Promise<void> {
     updateState({
       phase: "SUCCESS",
       progress: 100,
-      message: `MP4 ready from ${session.timeline.id} · ${durationSeconds.toFixed(1)}s · ${exported.encodedVideoChunks} video chunks · ${exported.encodedAudioChunks} audio chunks`,
+      message: `MP4 ready from ${session.timeline.id} · ${durationSeconds.toFixed(1)}s · ${media.images.size} decoded images · ${exported.encodedVideoChunks} video chunks · ${exported.encodedAudioChunks} audio chunks`,
     });
   } catch (error) {
     updateState({
@@ -220,6 +268,8 @@ async function exportMovieTimeline(session: StudioMovieSession): Promise<void> {
       progress: 0,
       message: error instanceof Error ? error.message : "MP4 timeline export failed.",
     });
+  } finally {
+    preparedMedia?.close();
   }
 }
 
@@ -237,7 +287,7 @@ function ensurePanel(assets: HTMLElement): HTMLElement {
   const note = document.createElement("p");
   note.className = "muted";
   note.dataset.exportTimelineSummary = "true";
-  note.textContent = "M34: export reads the open project's Timeline clips and source timing. Final media-asset rendering comes next.";
+  note.textContent = "M35: Timeline video clips decode real image media before MP4 composition.";
 
   const button = document.createElement("button");
   button.type = "button";
@@ -280,20 +330,21 @@ function syncExportPanel(): void {
   const session = currentMovieSession();
   const running = state.phase === "RUNNING";
   button.disabled = session === null || running;
-  setText(button, running ? `Exporting… ${state.progress}%` : "Export timeline MP4");
+  setText(button, running ? `Exporting… ${state.progress}%` : "Export media MP4");
   progress.value = state.progress;
   progress.hidden = state.phase === "IDLE" && session === null;
   status.dataset.exportPhase = state.phase;
 
   if (session === null) {
-    setText(summary, "M34: open the local demo project to attach its canonical Timeline session.");
-    if (!running) setText(status, "Open the local demo project to export its timeline.");
+    setText(summary, "M35: open the local demo project to attach its Timeline media session.");
+    if (!running) setText(status, "Open the local demo project to export its timeline media.");
   } else {
     setText(summary, timelineSummary(session));
     summary.dataset.timelineId = session.timeline.id;
     summary.dataset.timelineDurationSeconds = String(movieDurationSeconds(session));
+    summary.dataset.imageAssetCount = String(mediaAssetCount(session));
     if (!running && state.phase === "IDLE") {
-      setText(status, "Timeline ready for H.264 + Opus MP4 export.");
+      setText(status, "Timeline media ready for image decode + H.264/Opus MP4 export.");
     } else {
       setText(status, state.message);
     }

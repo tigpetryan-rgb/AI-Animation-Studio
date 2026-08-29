@@ -1,5 +1,11 @@
-const CACHE_NAME = "ai-animation-studio-shell-v1";
-const CORE_ASSETS = ["./", "./index.html", "./manifest.webmanifest"];
+const CACHE_NAME = "ai-animation-studio-shell-v2";
+const CORE_ASSETS = [
+  "./",
+  "./index.html",
+  "./manifest.webmanifest",
+  "./demo-media/opening-shot.svg",
+  "./demo-media/action-shot.svg",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

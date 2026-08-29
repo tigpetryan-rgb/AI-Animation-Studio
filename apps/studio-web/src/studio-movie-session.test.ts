@@ -15,11 +15,13 @@ describe("Studio movie session", () => {
     expect(session.timeline.tracks.map((track) => track.kind)).toEqual(["video", "audio"]);
   });
 
-  it("samples the first timeline clips through the timeline engine", () => {
+  it("samples the first timeline clip with a real image media binding", () => {
     const session = createLocalDemoMovieSession();
     const sample = sampleMovieTimeline(session, rationalTime(1n, 1n));
     expect(sample.video?.clip.id).toBe("opening-shot");
     expect(sample.video?.asset.label).toBe("Opening shot");
+    expect(sample.video?.asset.mediaType).toBe("image");
+    expect(sample.video?.asset.uri).toBe("./demo-media/opening-shot.svg");
     expect(rationalSeconds(sample.video!.sourceTime)).toBe(1);
     expect(sample.audio?.clip.id).toBe("opening-audio");
     expect(sample.audio?.asset.frequencyHz).toBe(330);
@@ -30,6 +32,8 @@ describe("Studio movie session", () => {
     const sample = sampleMovieTimeline(session, rationalTime(5n, 2n));
     expect(sample.video?.clip.id).toBe("action-shot");
     expect(sample.video?.asset.label).toBe("Action shot");
+    expect(sample.video?.asset.uri).toBe("./demo-media/action-shot.svg");
+    expect(sample.video?.asset.pan).toBe("right-to-left");
     expect(rationalSeconds(sample.video!.sourceTime)).toBe(1);
     expect(sample.audio?.clip.id).toBe("action-audio");
     expect(rationalSeconds(sample.audio!.sourceTime)).toBe(0.75);

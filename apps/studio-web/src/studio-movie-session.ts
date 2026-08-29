@@ -23,10 +23,10 @@ export interface MovieExportProfile {
 export interface MovieVideoAsset {
   readonly id: string;
   readonly kind: "video";
+  readonly mediaType: "image";
   readonly label: string;
-  readonly background: string;
-  readonly accent: string;
-  readonly motion: "left-to-right" | "orbit";
+  readonly uri: string;
+  readonly pan: "left-to-right" | "right-to-left";
 }
 
 export interface MovieAudioAsset {
@@ -130,6 +130,9 @@ function validateSession(session: StudioMovieSession): StudioMovieSession {
       if (asset === undefined || asset.kind !== track.kind) {
         throw new Error(`Clip ${clip.id} does not resolve to a ${track.kind} asset.`);
       }
+      if (asset.kind === "video" && (asset.mediaType !== "image" || asset.uri.trim().length === 0)) {
+        throw new Error(`Video asset ${asset.id} requires a decodable image URI.`);
+      }
     }
   }
   if (compareTime(movieDuration(session), ZERO_TIME) <= 0) {
@@ -148,18 +151,18 @@ export function createLocalDemoMovieSession(): StudioMovieSession {
     "visual-opening": Object.freeze({
       id: "visual-opening",
       kind: "video",
+      mediaType: "image",
       label: "Opening shot",
-      background: "rgb(20, 28, 46)",
-      accent: "rgb(88, 166, 255)",
-      motion: "left-to-right",
+      uri: "./demo-media/opening-shot.svg",
+      pan: "left-to-right",
     }),
     "visual-action": Object.freeze({
       id: "visual-action",
       kind: "video",
+      mediaType: "image",
       label: "Action shot",
-      background: "rgb(42, 24, 48)",
-      accent: "rgb(222, 108, 158)",
-      motion: "orbit",
+      uri: "./demo-media/action-shot.svg",
+      pan: "right-to-left",
     }),
     "audio-opening": Object.freeze({
       id: "audio-opening",
