@@ -1,10 +1,13 @@
-const CACHE_NAME = "ai-animation-studio-shell-v2";
+const CACHE_NAME = "ai-animation-studio-shell-v3";
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
   "./demo-media/opening-shot.svg",
   "./demo-media/action-shot.svg",
+  "./demo-media/action-shot.webm.b64",
+  "./demo-media/opening-tone.ogg.b64",
+  "./demo-media/action-tone.ogg.b64",
 ];
 
 self.addEventListener("install", (event) => {
