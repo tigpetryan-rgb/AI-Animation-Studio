@@ -4,9 +4,21 @@ import {
   parseDeviceVerificationReport,
   summarizeDeviceChecks,
   validateDeviceVerificationReport,
+  type DeviceBuildIdentity,
   type DeviceCheckResult,
   type DeviceVerificationReport,
 } from "../apps/studio-web/src/device-check";
+
+const TEST_BUILD: DeviceBuildIdentity = {
+  repository: "tigpetryan-rgb/AI-Animation-Studio",
+  commit: "1111111111111111111111111111111111111111",
+  sourceDate: "2026-08-29T11:00:00.000Z",
+};
+
+const OTHER_BUILD: DeviceBuildIdentity = {
+  ...TEST_BUILD,
+  commit: "2222222222222222222222222222222222222222",
+};
 
 function check(
   id: string,
@@ -38,9 +50,10 @@ function report(
   ];
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
+    build: TEST_BUILD,
     capturedAt: "2026-08-29T11:00:00.000Z",
-    userAgent: "M22 test browser",
+    userAgent: "M23 test browser",
     summary: summarizeDeviceChecks(checks),
     checks,
     note: "test report",
@@ -75,14 +88,17 @@ describe("device verification summary", () => {
 });
 
 describe("device report intake validation", () => {
-  it("accepts a canonical schema-v1 READY report", () => {
-    const result = validateDeviceVerificationReport(report());
+  it("accepts a canonical schema-v2 READY report", () => {
+    const result = validateDeviceVerificationReport(report(), TEST_BUILD);
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.report.summary).toBe("READY");
+    if (result.ok) {
+      expect(result.report.summary).toBe("READY");
+      expect(result.report.build).toEqual(TEST_BUILD);
+    }
   });
 
   it("accepts optional degradation and classifies FALLBACK", () => {
-    const result = validateDeviceVerificationReport(report({}, { webgpu: "UNAVAILABLE" }));
+    const result = validateDeviceVerificationReport(report({}, { webgpu: "UNAVAILABLE" }), TEST_BUILD);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
@@ -109,10 +125,30 @@ describe("device report intake validation", () => {
 
   it("rejects malformed JSON and unsupported schema versions", () => {
     expect(parseDeviceVerificationReport("{").ok).toBe(false);
-    const wrongSchema = { ...report(), schemaVersion: 2 };
+    const wrongSchema = { ...report(), schemaVersion: 1 };
     const validation = validateDeviceVerificationReport(wrongSchema);
     expect(validation.ok).toBe(false);
-    if (!validation.ok) expect(validation.issues).toContain("schemaVersion must equal 1.");
+    if (!validation.ok) expect(validation.issues).toContain("schemaVersion must equal 2.");
+  });
+
+  it("rejects an invalid build SHA", () => {
+    const candidate = report();
+    const validation = validateDeviceVerificationReport({
+      ...candidate,
+      build: { ...candidate.build, commit: "not-a-sha" },
+    });
+    expect(validation.ok).toBe(false);
+    if (!validation.ok) {
+      expect(validation.issues).toContain("build.commit must be a 40-character lowercase hexadecimal SHA.");
+    }
+  });
+
+  it("rejects evidence produced by a different Studio build", () => {
+    const validation = validateDeviceVerificationReport(report(), OTHER_BUILD);
+    expect(validation.ok).toBe(false);
+    if (!validation.ok) {
+      expect(validation.issues.some((issue) => issue.includes("does not match running Studio build"))).toBe(true);
+    }
   });
 
   it("rejects a missing canonical required check", () => {
