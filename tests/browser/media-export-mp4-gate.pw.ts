@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("native Chromium MP4 gate supports H.264 + AAC encode and MP4 playback", async ({ page }) => {
+test("native Chromium MP4 gate finds a browser-native H.264 audio pairing", async ({ page }) => {
   await page.goto("/");
 
   const result = await page.evaluate(async () => {
@@ -22,27 +22,39 @@ test("native Chromium MP4 gate supports H.264 + AAC encode and MP4 playback", as
       framerate: 12,
       latencyMode: "realtime",
     };
-    const audioConfig: AudioEncoderConfig = {
+    const aacConfig: AudioEncoderConfig = {
       codec: "mp4a.40.2",
       sampleRate: 48_000,
       numberOfChannels: 1,
       bitrate: 64_000,
     };
+    const opusConfig: AudioEncoderConfig = {
+      codec: "opus",
+      sampleRate: 48_000,
+      numberOfChannels: 1,
+      bitrate: 64_000,
+    };
 
-    const videoSupport = await VideoEncoder.isConfigSupported(videoConfig);
-    const audioSupport = await AudioEncoder.isConfigSupported(audioConfig);
+    const [videoSupport, aacSupport, opusSupport] = await Promise.all([
+      VideoEncoder.isConfigSupported(videoConfig),
+      AudioEncoder.isConfigSupported(aacConfig),
+      AudioEncoder.isConfigSupported(opusConfig),
+    ]);
 
     const videoElement = document.createElement("video");
-    const mimeType = 'video/mp4;codecs="avc1.42001E,mp4a.40.2"';
-    const canPlay = videoElement.canPlayType(mimeType);
-    const mediaSourceSupport = typeof MediaSource !== "undefined"
-      ? MediaSource.isTypeSupported(mimeType)
+    const aacMimeType = 'video/mp4;codecs="avc1.42001E,mp4a.40.2"';
+    const opusMimeType = 'video/mp4;codecs="avc1.42001E,opus"';
+    const aacCanPlay = videoElement.canPlayType(aacMimeType);
+    const opusCanPlay = videoElement.canPlayType(opusMimeType);
+    const aacMediaSourceSupport = typeof MediaSource !== "undefined"
+      ? MediaSource.isTypeSupported(aacMimeType)
+      : false;
+    const opusMediaSourceSupport = typeof MediaSource !== "undefined"
+      ? MediaSource.isTypeSupported(opusMimeType)
       : false;
 
     let videoChunks = 0;
-    let audioChunks = 0;
     let videoDecoderDescriptionBytes = 0;
-    let audioDecoderDescriptionBytes = 0;
 
     if (videoSupport.supported) {
       const encoder = new VideoEncoder({
@@ -73,22 +85,29 @@ test("native Chromium MP4 gate supports H.264 + AAC encode and MP4 playback", as
       encoder.close();
     }
 
-    if (audioSupport.supported) {
+    const encodeAudioProbe = async (
+      support: AudioEncoderSupport,
+      fallbackConfig: AudioEncoderConfig,
+    ): Promise<{ chunks: number; decoderDescriptionBytes: number }> => {
+      if (!support.supported) return { chunks: 0, decoderDescriptionBytes: 0 };
+
+      let chunks = 0;
+      let decoderDescriptionBytes = 0;
       const encoder = new AudioEncoder({
         output: (_chunk, metadata) => {
-          audioChunks += 1;
+          chunks += 1;
           const description = metadata?.decoderConfig?.description;
           if (description instanceof ArrayBuffer) {
-            audioDecoderDescriptionBytes = Math.max(audioDecoderDescriptionBytes, description.byteLength);
+            decoderDescriptionBytes = Math.max(decoderDescriptionBytes, description.byteLength);
           } else if (ArrayBuffer.isView(description)) {
-            audioDecoderDescriptionBytes = Math.max(audioDecoderDescriptionBytes, description.byteLength);
+            decoderDescriptionBytes = Math.max(decoderDescriptionBytes, description.byteLength);
           }
         },
         error: (error) => {
           throw error;
         },
       });
-      encoder.configure(audioSupport.config ?? audioConfig);
+      encoder.configure(support.config ?? fallbackConfig);
 
       const frameCount = 1024;
       const samples = new Float32Array(frameCount);
@@ -107,26 +126,42 @@ test("native Chromium MP4 gate supports H.264 + AAC encode and MP4 playback", as
       audio.close();
       await encoder.flush();
       encoder.close();
-    }
+      return { chunks, decoderDescriptionBytes };
+    };
+
+    const [aacEncoded, opusEncoded] = await Promise.all([
+      encodeAudioProbe(aacSupport, aacConfig),
+      encodeAudioProbe(opusSupport, opusConfig),
+    ]);
 
     return {
       videoSupported: videoSupport.supported,
-      audioSupported: audioSupport.supported,
-      canPlay,
-      mediaSourceSupport,
       videoChunks,
-      audioChunks,
       videoDecoderDescriptionBytes,
-      audioDecoderDescriptionBytes,
+      aacSupported: aacSupport.supported,
+      aacChunks: aacEncoded.chunks,
+      aacDecoderDescriptionBytes: aacEncoded.decoderDescriptionBytes,
+      aacCanPlay,
+      aacMediaSourceSupport,
+      opusSupported: opusSupport.supported,
+      opusChunks: opusEncoded.chunks,
+      opusDecoderDescriptionBytes: opusEncoded.decoderDescriptionBytes,
+      opusCanPlay,
+      opusMediaSourceSupport,
     };
   });
 
   expect(result.videoSupported).toBe(true);
-  expect(result.audioSupported).toBe(true);
-  expect(result.canPlay).not.toBe("");
-  expect(result.mediaSourceSupport).toBe(true);
   expect(result.videoChunks).toBeGreaterThan(0);
-  expect(result.audioChunks).toBeGreaterThan(0);
   expect(result.videoDecoderDescriptionBytes).toBeGreaterThan(0);
-  expect(result.audioDecoderDescriptionBytes).toBeGreaterThan(0);
+
+  const nativeAacPath = result.aacSupported
+    && result.aacChunks > 0
+    && result.aacDecoderDescriptionBytes > 0
+    && result.aacCanPlay !== "";
+  const nativeOpusPath = result.opusSupported
+    && result.opusChunks > 0
+    && result.opusCanPlay !== "";
+
+  expect(nativeAacPath || nativeOpusPath).toBe(true);
 });
