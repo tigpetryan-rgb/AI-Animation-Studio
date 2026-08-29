@@ -7,9 +7,12 @@
   },
   "references": [
     { "path": "../../packages/browser-probe" },
+    { "path": "../../packages/core-project" },
+    { "path": "../../packages/core-time" },
     { "path": "../../packages/media-export" },
     { "path": "../../packages/platform-capabilities" },
-    { "path": "../../packages/studio-shell" }
+    { "path": "../../packages/studio-shell" },
+    { "path": "../../packages/timeline-engine" }
   ],
   "include": ["src/**/*.ts"]
 }
