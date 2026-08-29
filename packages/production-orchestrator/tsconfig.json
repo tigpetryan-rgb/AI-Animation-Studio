@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "references": [
+    { "path": "../production-autopilot" },
+    { "path": "../production-manifest" },
+    { "path": "../qc-engine" },
+    { "path": "../security-policy" }
+  ],
+  "include": ["src/**/*.ts"]
+}
