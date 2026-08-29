@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createStudioProject } from "@aistudio/core-project";
+import { asCharacterId, asProjectId } from "@aistudio/core-types";
 import type { ProductionManifest } from "@aistudio/production-manifest";
 import type { ProductionGateResult } from "@aistudio/production-orchestrator";
 import type { QCReport } from "@aistudio/qc-engine";
@@ -25,7 +26,7 @@ const OTHER_HASH = "b".repeat(64);
 const SHOT_ID = "shot-1";
 
 function project() {
-  return createStudioProject({ projectId: "project-1", name: "Film" });
+  return createStudioProject({ projectId: asProjectId("project-1"), name: "Film" });
 }
 
 function gate(kind: ProductionGateResult["kind"]): ProductionGateResult {
@@ -382,7 +383,7 @@ describe("transactional production runtime", () => {
       humanApproved: true,
       commands: [{
         type: "MOVE_ACTOR",
-        actorId: "missing-actor",
+        actorId: asCharacterId("missing-actor"),
         to: {
           position: { x: 0, y: 0, z: 0 },
           rotation: { x: 0, y: 0, z: 0, w: 1 },
