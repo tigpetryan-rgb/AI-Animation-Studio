@@ -12,6 +12,7 @@
     { "path": "./packages/continuity-engine" },
     { "path": "./packages/performance-engine" },
     { "path": "./packages/ai-runtime" },
-    { "path": "./packages/qc-engine" }
+    { "path": "./packages/qc-engine" },
+    { "path": "./packages/platform-capabilities" }
   ]
 }
