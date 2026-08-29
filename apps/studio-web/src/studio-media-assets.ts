@@ -72,7 +72,9 @@ async function fetchMediaBlob(
 
   if (asset.encoding === "base64") {
     const bytes = decodeBase64(await response.text());
-    return new Blob([bytes.buffer], { type: asset.mimeType });
+    const buffer = new ArrayBuffer(bytes.byteLength);
+    new Uint8Array(buffer).set(bytes);
+    return new Blob([buffer], { type: asset.mimeType });
   }
 
   const blob = await response.blob();
