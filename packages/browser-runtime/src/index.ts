@@ -109,10 +109,16 @@ export function createAtomicSavePlan(targetPath: string, revision: number): Atom
   if (!Number.isSafeInteger(revision) || revision < 0) {
     throw new RangeError("revision must be a non-negative safe integer.");
   }
+  const steps: readonly AtomicSaveStep[] = Object.freeze([
+    "WRITE_TEMP",
+    "VERIFY_TEMP",
+    "REPLACE_TARGET",
+    "CLEANUP_TEMP",
+  ]);
   return Object.freeze({
     targetPath: target,
     tempPath: `${target}.tmp.${revision}`,
-    steps: Object.freeze(["WRITE_TEMP", "VERIFY_TEMP", "REPLACE_TARGET", "CLEANUP_TEMP"]),
+    steps,
   });
 }
 
