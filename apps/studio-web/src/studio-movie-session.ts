@@ -20,21 +20,39 @@ export interface MovieExportProfile {
   readonly numberOfChannels: 1;
 }
 
-export interface MovieVideoAsset {
+export type MovieMediaEncoding = "identity" | "base64";
+
+interface MovieMediaSource {
+  readonly uri: string;
+  readonly encoding: MovieMediaEncoding;
+  readonly mimeType: string;
+}
+
+export interface MovieImageAsset extends MovieMediaSource {
   readonly id: string;
   readonly kind: "video";
   readonly mediaType: "image";
   readonly label: string;
-  readonly uri: string;
   readonly pan: "left-to-right" | "right-to-left";
 }
 
-export interface MovieAudioAsset {
+export interface MovieVideoFileAsset extends MovieMediaSource {
+  readonly id: string;
+  readonly kind: "video";
+  readonly mediaType: "video";
+  readonly label: string;
+  readonly loop: boolean;
+}
+
+export type MovieVideoAsset = MovieImageAsset | MovieVideoFileAsset;
+
+export interface MovieAudioAsset extends MovieMediaSource {
   readonly id: string;
   readonly kind: "audio";
+  readonly mediaType: "audio";
   readonly label: string;
-  readonly frequencyHz: number;
   readonly gain: number;
+  readonly loop: boolean;
 }
 
 export type MovieTimelineAsset = MovieVideoAsset | MovieAudioAsset;
@@ -118,20 +136,32 @@ export function rationalSeconds(time: RationalTime): number {
   return seconds(time);
 }
 
-function validateSession(session: StudioMovieSession): StudioMovieSession {
+function validateMediaSource(asset: MovieTimelineAsset): void {
+  if (asset.uri.trim().length === 0) throw new Error(`Media asset ${asset.id} requires a URI.`);
+  if (asset.mimeType.trim().length === 0) throw new Error(`Media asset ${asset.id} requires a MIME type.`);
+  if (asset.mediaType === "image" && !asset.mimeType.startsWith("image/")) {
+    throw new Error(`Image asset ${asset.id} requires an image MIME type.`);
+  }
+  if (asset.mediaType === "video" && !asset.mimeType.startsWith("video/")) {
+    throw new Error(`Video asset ${asset.id} requires a video MIME type.`);
+  }
+  if (asset.mediaType === "audio" && !asset.mimeType.startsWith("audio/")) {
+    throw new Error(`Audio asset ${asset.id} requires an audio MIME type.`);
+  }
+}
+
+export function validateMovieSession(session: StudioMovieSession): StudioMovieSession {
   const diagnostics = validateTimeline(session.timeline);
   if (diagnostics.length > 0) {
-    throw new Error(`Demo movie timeline is invalid: ${diagnostics[0]?.code ?? "unknown"}.`);
+    throw new Error(`Movie timeline is invalid: ${diagnostics[0]?.code ?? "unknown"}.`);
   }
+  for (const asset of Object.values(session.assets)) validateMediaSource(asset);
   for (const track of session.timeline.tracks) {
     if (track.kind !== "video" && track.kind !== "audio") continue;
     for (const clip of track.clips) {
       const asset = session.assets[clip.assetId];
       if (asset === undefined || asset.kind !== track.kind) {
         throw new Error(`Clip ${clip.id} does not resolve to a ${track.kind} asset.`);
-      }
-      if (asset.kind === "video" && (asset.mediaType !== "image" || asset.uri.trim().length === 0)) {
-        throw new Error(`Video asset ${asset.id} requires a decodable image URI.`);
       }
     }
   }
@@ -154,29 +184,41 @@ export function createLocalDemoMovieSession(): StudioMovieSession {
       mediaType: "image",
       label: "Opening shot",
       uri: "./demo-media/opening-shot.svg",
+      encoding: "identity",
+      mimeType: "image/svg+xml",
       pan: "left-to-right",
     }),
     "visual-action": Object.freeze({
       id: "visual-action",
       kind: "video",
-      mediaType: "image",
-      label: "Action shot",
-      uri: "./demo-media/action-shot.svg",
-      pan: "right-to-left",
+      mediaType: "video",
+      label: "Action video",
+      uri: "./demo-media/action-shot.webm.b64",
+      encoding: "base64",
+      mimeType: "video/webm",
+      loop: true,
     }),
     "audio-opening": Object.freeze({
       id: "audio-opening",
       kind: "audio",
-      label: "Opening tone",
-      frequencyHz: 330,
-      gain: 0.1,
+      mediaType: "audio",
+      label: "Opening audio",
+      uri: "./demo-media/opening-tone.ogg.b64",
+      encoding: "base64",
+      mimeType: "audio/ogg",
+      gain: 0.32,
+      loop: true,
     }),
     "audio-action": Object.freeze({
       id: "audio-action",
       kind: "audio",
-      label: "Action tone",
-      frequencyHz: 523.25,
-      gain: 0.1,
+      mediaType: "audio",
+      label: "Action audio",
+      uri: "./demo-media/action-tone.ogg.b64",
+      encoding: "base64",
+      mimeType: "audio/ogg",
+      gain: 0.32,
+      loop: true,
     }),
   });
 
@@ -228,7 +270,7 @@ export function createLocalDemoMovieSession(): StudioMovieSession {
     ]),
   });
 
-  return validateSession(Object.freeze({
+  return validateMovieSession(Object.freeze({
     project,
     timeline,
     assets,
