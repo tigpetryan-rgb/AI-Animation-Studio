@@ -1,6 +1,12 @@
 import { expect, test } from "@playwright/test";
 
-test("Studio exports a real MP4 from the opened demo timeline", async ({ page }) => {
+test("Studio decodes real image assets and exports them from the demo timeline", async ({ page }) => {
+  const mediaRequests: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname.includes("/demo-media/")) mediaRequests.push(url.pathname);
+  });
+
   await page.goto("/");
 
   const exportButton = page.locator("[data-export-mp4-button]");
@@ -13,16 +19,20 @@ test("Studio exports a real MP4 from the opened demo timeline", async ({ page })
 
   await page.getByRole("button", { name: "Open local demo" }).click();
   await expect(exportButton).toBeEnabled();
-  await expect(exportButton).toHaveText("Export timeline MP4");
+  await expect(exportButton).toHaveText("Export media MP4");
   await expect(timelineSummary).toHaveAttribute("data-timeline-id", "local-demo-timeline");
   await expect(timelineSummary).toHaveAttribute("data-timeline-duration-seconds", "4");
+  await expect(timelineSummary).toHaveAttribute("data-image-asset-count", "2");
   await expect(timelineSummary).toContainText("2 video clips");
   await expect(timelineSummary).toContainText("2 audio clips");
+  await expect(timelineSummary).toContainText("2 image assets");
 
   const downloadPromise = page.waitForEvent("download");
   await exportButton.click();
   const download = await downloadPromise;
 
+  expect(mediaRequests).toContain("/demo-media/opening-shot.svg");
+  expect(mediaRequests).toContain("/demo-media/action-shot.svg");
   expect(download.suggestedFilename()).toBe("local-demo-project-timeline.mp4");
   const stream = await download.createReadStream();
   if (stream === null) throw new Error("MP4 download stream was unavailable.");
@@ -38,5 +48,6 @@ test("Studio exports a real MP4 from the opened demo timeline", async ({ page })
   await expect(exportStatus).toHaveAttribute("data-export-phase", "SUCCESS");
   await expect(exportStatus).toContainText("MP4 ready from local-demo-timeline");
   await expect(exportStatus).toContainText("4.0s");
+  await expect(exportStatus).toContainText("2 decoded images");
   await expect(page.locator("[data-export-mp4-progress]")).toHaveJSProperty("value", 100);
 });
