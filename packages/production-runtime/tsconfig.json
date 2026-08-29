@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "references": [
+    { "path": "../core-events" },
+    { "path": "../core-project" },
+    { "path": "../production-autopilot" },
+    { "path": "../production-manifest" },
+    { "path": "../production-orchestrator" },
+    { "path": "../qc-engine" },
+    { "path": "../workflow-engine" }
+  ],
+  "include": ["src/**/*.ts"]
+}
