@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -35,3 +37,45 @@ jobs:
 
       - name: Browser smoke
         run: npm run test:browser
+
+      - name: Capture canonical source identity
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          SOURCE_SHA="${PR_HEAD_SHA:-$GITHUB_SHA}"
+          echo "AISTUDIO_SOURCE_SHA=${SOURCE_SHA}" >> "$GITHUB_ENV"
+          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "${SOURCE_SHA}")" >> "$GITHUB_ENV"
+
+      - name: Build release candidate package
+        run: |
+          npm run release:manifest
+          bash scripts/package-release-candidate.sh
+
+      - name: Verify release candidate checksum
+        run: |
+          cd release
+          sha256sum -c AI-Animation-Studio-Web-RC.zip.sha256
+
+      - name: Verify extracted release candidate
+        run: |
+          rm -rf /tmp/aistudio-rc-check
+          mkdir -p /tmp/aistudio-rc-check
+          unzip -q release/AI-Animation-Studio-Web-RC.zip -d /tmp/aistudio-rc-check
+          cd /tmp/aistudio-rc-check
+          sha256sum -c studio-web-files.sha256
+          test -f studio-web/index.html
+          test -f studio-web/sw.js
+          node -e 'const fs=require("fs"); const m=JSON.parse(fs.readFileSync("studio-web-release-manifest.json","utf8")); if(m.source.commit!==process.env.AISTUDIO_SOURCE_SHA){throw new Error(`Manifest source mismatch: ${m.source.commit} != ${process.env.AISTUDIO_SOURCE_SHA}`)}'
+
+      - name: Upload release candidate artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-web-rc-${{ env.AISTUDIO_SOURCE_SHA }}
+          path: |
+            release/AI-Animation-Studio-Web-RC.zip
+            release/AI-Animation-Studio-Web-RC.zip.sha256
+            release/studio-web-release-manifest.json
+            release/studio-web-files.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
