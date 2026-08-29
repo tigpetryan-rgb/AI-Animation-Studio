@@ -44,7 +44,9 @@ function safeFileStem(projectId: string): string {
 }
 
 function downloadMp4(bytes: Uint8Array, mimeType: string, projectId: string): void {
-  const blob = new Blob([bytes], { type: mimeType });
+  const blobBytes = new Uint8Array(bytes.byteLength);
+  blobBytes.set(bytes);
+  const blob = new Blob([blobBytes.buffer], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
