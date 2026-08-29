@@ -23,14 +23,36 @@ function requireBaseUrl(value?: string): string {
   throw new Error("Movie media loading requires a base URL outside the browser document.");
 }
 
+async function decodeBrowserImage(blob: Blob): Promise<ImageBitmap> {
+  if (typeof document === "undefined" || typeof Image === "undefined") {
+    throw new Error("DOM image decoding is unavailable for movie media.");
+  }
+  if (typeof createImageBitmap !== "function") {
+    throw new Error("createImageBitmap is unavailable for movie media decoding.");
+  }
+
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const image = new Image();
+    image.decoding = "sync";
+    image.src = objectUrl;
+    await image.decode();
+    if (image.naturalWidth <= 0 || image.naturalHeight <= 0) {
+      throw new Error("Decoded image has invalid natural dimensions.");
+    }
+    return createImageBitmap(image);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 export async function prepareMovieMedia(
   session: StudioMovieSession,
   dependencies: MovieMediaLoadDependencies = {},
 ): Promise<PreparedMovieMedia> {
   const fetchAsset = dependencies.fetchAsset ?? globalThis.fetch;
-  const decodeImage = dependencies.decodeImage ?? globalThis.createImageBitmap;
+  const decodeImage = dependencies.decodeImage ?? decodeBrowserImage;
   if (typeof fetchAsset !== "function") throw new Error("Fetch is unavailable for movie media loading.");
-  if (typeof decodeImage !== "function") throw new Error("createImageBitmap is unavailable for movie media decoding.");
 
   const baseUrl = requireBaseUrl(dependencies.baseUrl);
   const images = new Map<string, ImageBitmap>();
