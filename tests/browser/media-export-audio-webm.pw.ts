@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import * as ts from "typescript";
 
-const source = readFileSync(new URL("../../packages/media-export/src/audio.ts", import.meta.url), "utf8");
+const source = readFileSync(new URL("../../packages/media-export/src/audio-core.ts", import.meta.url), "utf8");
 const browserModule = ts.transpileModule(
   `${source}\n(globalThis as any).__m30AudioExport = { exportOpusWebM, hasOpusWebMHeader };`,
   {
