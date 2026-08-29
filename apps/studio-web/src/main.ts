@@ -10,6 +10,11 @@ import {
   type StudioShellState,
   type StudioWorkspace,
 } from "@aistudio/studio-shell";
+import {
+  runBrowserDeviceVerification,
+  serializeDeviceVerificationReport,
+  type DeviceVerificationReport,
+} from "./device-check";
 import { createStudioBootModel } from "./runtime";
 
 function probeWebGl2(): boolean {
@@ -44,6 +49,8 @@ const evidence = probeWithEvidence(
 );
 const boot = createStudioBootModel(evidence.snapshot);
 let shellState: StudioShellState = boot.shell;
+let deviceReport: DeviceVerificationReport | null = null;
+let deviceCheckRunning = false;
 const root = requireStudioRoot();
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string): HTMLElementTagNameMap[K] {
@@ -81,6 +88,58 @@ function openDemoProject(): void {
     projectId: "local-demo-project",
   }).state;
   render();
+}
+
+async function runDeviceCheck(): Promise<void> {
+  deviceCheckRunning = true;
+  render();
+  deviceReport = await runBrowserDeviceVerification();
+  deviceCheckRunning = false;
+  render();
+}
+
+function downloadDeviceReport(report: DeviceVerificationReport): void {
+  const blob = new Blob([serializeDeviceVerificationReport(report)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `aistudio-device-verification-${report.capturedAt.replaceAll(":", "-")}.json`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function renderDeviceVerification(inspector: HTMLElement): void {
+  inspector.append(text("h3", "Device verification"));
+
+  const runButton = el("button", "device-check-button");
+  runButton.type = "button";
+  runButton.textContent = deviceCheckRunning ? "Checking device…" : "Run device check";
+  runButton.disabled = deviceCheckRunning;
+  runButton.addEventListener("click", () => void runDeviceCheck());
+  inspector.append(runButton);
+
+  if (!deviceReport) return;
+
+  const summary = text("div", `Device check: ${deviceReport.summary}`, `device-summary summary-${deviceReport.summary.toLowerCase()}`);
+  summary.dataset.summary = deviceReport.summary;
+  inspector.append(summary);
+
+  const list = el("ul", "device-check-list");
+  for (const check of deviceReport.checks) {
+    const item = el("li", `check-${check.status.toLowerCase()}`);
+    item.dataset.checkId = check.id;
+    const headline = el("div", "check-headline");
+    headline.append(text("span", check.label), text("strong", check.status));
+    item.append(headline, text("p", `${check.detail} · ${check.durationMs} ms`, "muted"));
+    list.append(item);
+  }
+  inspector.append(list);
+
+  const downloadButton = el("button", "device-report-download");
+  downloadButton.type = "button";
+  downloadButton.textContent = "Download verification report";
+  downloadButton.addEventListener("click", () => downloadDeviceReport(deviceReport as DeviceVerificationReport));
+  inspector.append(downloadButton, text("p", deviceReport.note, "verification-note"));
 }
 
 function render(): void {
@@ -142,6 +201,7 @@ function render(): void {
     inspector.append(list);
   }
 
+  renderDeviceVerification(inspector);
   body.append(assets, viewport, inspector);
 
   const timeline = el("footer", "timeline");
