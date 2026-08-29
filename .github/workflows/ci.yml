@@ -26,3 +26,6 @@ jobs:
 
       - name: Test
         run: npm test
+
+      - name: Build Studio Web
+        run: npm run build:web
