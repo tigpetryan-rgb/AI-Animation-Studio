@@ -7,6 +7,7 @@
   },
   "references": [
     { "path": "../../packages/browser-probe" },
+    { "path": "../../packages/media-export" },
     { "path": "../../packages/platform-capabilities" },
     { "path": "../../packages/studio-shell" }
   ],
