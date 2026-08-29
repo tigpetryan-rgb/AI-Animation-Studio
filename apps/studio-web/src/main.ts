@@ -32,15 +32,19 @@ function probeWasmSimd(): boolean {
   }
 }
 
+function requireStudioRoot(): HTMLDivElement {
+  const node = document.querySelector<HTMLDivElement>("#app");
+  if (node === null) throw new Error("Studio root element was not found.");
+  return node;
+}
+
 const evidence = probeWithEvidence(
   globalThis as unknown as BrowserGlobalLike,
   safeBrowserFeatureProbes({ webgl2: probeWebGl2, wasmSimd: probeWasmSimd }),
 );
 const boot = createStudioBootModel(evidence.snapshot);
 let shellState: StudioShellState = boot.shell;
-
-const root = document.querySelector<HTMLDivElement>("#app");
-if (!root) throw new Error("Studio root element was not found.");
+const root = requireStudioRoot();
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
