@@ -14,6 +14,7 @@
     { "path": "./packages/ai-runtime" },
     { "path": "./packages/qc-engine" },
     { "path": "./packages/platform-capabilities" },
-    { "path": "./packages/studio-shell" }
+    { "path": "./packages/studio-shell" },
+    { "path": "./packages/browser-runtime" }
   ]
 }
