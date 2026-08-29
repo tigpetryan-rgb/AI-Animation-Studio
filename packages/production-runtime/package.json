@@ -8,6 +8,7 @@
   "dependencies": {
     "@aistudio/core-events": "0.0.0",
     "@aistudio/core-project": "0.0.0",
+    "@aistudio/core-types": "0.0.0",
     "@aistudio/production-autopilot": "0.0.0",
     "@aistudio/production-manifest": "0.0.0",
     "@aistudio/production-orchestrator": "0.0.0",
