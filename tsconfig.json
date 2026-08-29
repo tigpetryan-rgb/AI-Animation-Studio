@@ -18,6 +18,7 @@
     { "path": "./packages/browser-runtime" },
     { "path": "./packages/project-storage" },
     { "path": "./packages/browser-probe" },
-    { "path": "./packages/resource-budget" }
+    { "path": "./packages/resource-budget" },
+    { "path": "./packages/production-autopilot" }
   ]
 }
