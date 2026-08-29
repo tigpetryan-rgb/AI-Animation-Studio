@@ -83,7 +83,9 @@ export function slotFilename(slot: PersistenceSlot): string {
 }
 
 export async function sha256Hex(data: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", data);
+  const buffer = new ArrayBuffer(data.byteLength);
+  new Uint8Array(buffer).set(data);
+  const digest = await crypto.subtle.digest("SHA-256", buffer);
   return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("");
 }
 
