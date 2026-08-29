@@ -29,3 +29,9 @@ jobs:
 
       - name: Build Studio Web
         run: npm run build:web
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser smoke
+        run: npm run test:browser
