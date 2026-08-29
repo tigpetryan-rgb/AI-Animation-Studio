@@ -1,6 +1,16 @@
+declare const __AISTUDIO_BUILD_REPOSITORY__: string;
+declare const __AISTUDIO_BUILD_COMMIT__: string;
+declare const __AISTUDIO_BUILD_SOURCE_DATE__: string;
+
 export type DeviceCheckStatus = "PASS" | "FAIL" | "UNAVAILABLE";
 export type DeviceVerificationSummary = "READY" | "DEGRADED" | "FAILED";
 export type DeviceCompatibilityMode = "FULL" | "FALLBACK" | "BLOCKED";
+
+export interface DeviceBuildIdentity {
+  readonly repository: string;
+  readonly commit: string;
+  readonly sourceDate: string;
+}
 
 export interface DeviceCheckResult {
   readonly id: string;
@@ -12,7 +22,8 @@ export interface DeviceCheckResult {
 }
 
 export interface DeviceVerificationReport {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
+  readonly build: DeviceBuildIdentity;
   readonly capturedAt: string;
   readonly userAgent: string;
   readonly summary: DeviceVerificationSummary;
@@ -33,6 +44,11 @@ export interface DeviceVerificationIntake {
   readonly failedRequired: readonly string[];
   readonly degradedOptional: readonly string[];
 }
+
+const STUDIO_REPOSITORY = "tigpetryan-rgb/AI-Animation-Studio";
+const DEVELOPMENT_COMMIT = "0000000000000000000000000000000000000000";
+const DEVELOPMENT_SOURCE_DATE = "1970-01-01T00:00:00.000Z";
+const SHA40 = /^[0-9a-f]{40}$/;
 
 const REQUIRED_CHECK_IDS = [
   "secure-context",
@@ -90,17 +106,76 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+export function currentStudioBuildIdentity(): DeviceBuildIdentity {
+  return {
+    repository:
+      typeof __AISTUDIO_BUILD_REPOSITORY__ === "string"
+        ? __AISTUDIO_BUILD_REPOSITORY__
+        : STUDIO_REPOSITORY,
+    commit:
+      typeof __AISTUDIO_BUILD_COMMIT__ === "string"
+        ? __AISTUDIO_BUILD_COMMIT__
+        : DEVELOPMENT_COMMIT,
+    sourceDate:
+      typeof __AISTUDIO_BUILD_SOURCE_DATE__ === "string"
+        ? __AISTUDIO_BUILD_SOURCE_DATE__
+        : DEVELOPMENT_SOURCE_DATE,
+  };
+}
+
 export function summarizeDeviceChecks(checks: readonly DeviceCheckResult[]): DeviceVerificationSummary {
   if (checks.some((check) => check.required && check.status !== "PASS")) return "FAILED";
   if (checks.some((check) => check.status !== "PASS")) return "DEGRADED";
   return "READY";
 }
 
-export function validateDeviceVerificationReport(input: unknown): DeviceReportValidation {
+export function validateDeviceVerificationReport(
+  input: unknown,
+  expectedBuild?: DeviceBuildIdentity,
+): DeviceReportValidation {
   const issues: string[] = [];
   if (!isRecord(input)) return { ok: false, issues: ["Report root must be a JSON object."] };
 
-  if (input.schemaVersion !== 1) issues.push("schemaVersion must equal 1.");
+  if (input.schemaVersion !== 2) issues.push("schemaVersion must equal 2.");
+
+  let build: DeviceBuildIdentity | null = null;
+  if (!isRecord(input.build)) {
+    issues.push("build must be an object.");
+  } else {
+    const repository = input.build.repository;
+    const commit = input.build.commit;
+    const sourceDate = input.build.sourceDate;
+
+    if (repository !== STUDIO_REPOSITORY) {
+      issues.push(`build.repository must equal ${STUDIO_REPOSITORY}.`);
+    }
+    if (typeof commit !== "string" || !SHA40.test(commit)) {
+      issues.push("build.commit must be a 40-character lowercase hexadecimal SHA.");
+    }
+    if (!isNonEmptyString(sourceDate) || Number.isNaN(Date.parse(sourceDate))) {
+      issues.push("build.sourceDate must be a valid date/time string.");
+    }
+
+    if (
+      repository === STUDIO_REPOSITORY
+      && typeof commit === "string"
+      && SHA40.test(commit)
+      && isNonEmptyString(sourceDate)
+      && !Number.isNaN(Date.parse(sourceDate))
+    ) {
+      build = { repository, commit, sourceDate };
+    }
+  }
+
+  if (build && expectedBuild) {
+    if (build.repository !== expectedBuild.repository) {
+      issues.push(`Report repository ${build.repository} does not match running Studio repository ${expectedBuild.repository}.`);
+    }
+    if (build.commit !== expectedBuild.commit) {
+      issues.push(`Report build commit ${build.commit} does not match running Studio build ${expectedBuild.commit}.`);
+    }
+  }
+
   if (!isNonEmptyString(input.capturedAt) || Number.isNaN(Date.parse(input.capturedAt))) {
     issues.push("capturedAt must be a valid date/time string.");
   }
@@ -177,12 +252,13 @@ export function validateDeviceVerificationReport(input: unknown): DeviceReportVa
     }
   }
 
-  if (issues.length > 0) return { ok: false, issues };
+  if (issues.length > 0 || build === null) return { ok: false, issues };
 
   return {
     ok: true,
     report: {
-      schemaVersion: 1,
+      schemaVersion: 2,
+      build,
       capturedAt: input.capturedAt as string,
       userAgent: input.userAgent as string,
       summary: input.summary as DeviceVerificationSummary,
@@ -192,9 +268,12 @@ export function validateDeviceVerificationReport(input: unknown): DeviceReportVa
   };
 }
 
-export function parseDeviceVerificationReport(json: string): DeviceReportValidation {
+export function parseDeviceVerificationReport(
+  json: string,
+  expectedBuild?: DeviceBuildIdentity,
+): DeviceReportValidation {
   try {
-    return validateDeviceVerificationReport(JSON.parse(json) as unknown);
+    return validateDeviceVerificationReport(JSON.parse(json) as unknown, expectedBuild);
   } catch (error) {
     return {
       ok: false,
@@ -385,12 +464,13 @@ export async function runBrowserDeviceVerification(): Promise<DeviceVerification
   ]);
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
+    build: currentStudioBuildIdentity(),
     capturedAt: new Date().toISOString(),
     userAgent: navigator.userAgent,
     summary: summarizeDeviceChecks(checks),
     checks,
-    note: "This report proves runtime behavior on this browser session only; it is not a cross-device performance guarantee.",
+    note: "This report proves runtime behavior for this exact Studio build and browser session only; it is not a cross-device performance guarantee.",
   };
 }
 
