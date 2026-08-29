@@ -11,6 +11,8 @@ import {
   type StudioWorkspace,
 } from "@aistudio/studio-shell";
 import {
+  analyzeDeviceVerificationReport,
+  parseDeviceVerificationReport,
   runBrowserDeviceVerification,
   serializeDeviceVerificationReport,
   type DeviceVerificationReport,
@@ -50,6 +52,8 @@ const evidence = probeWithEvidence(
 const boot = createStudioBootModel(evidence.snapshot);
 let shellState: StudioShellState = boot.shell;
 let deviceReport: DeviceVerificationReport | null = null;
+let deviceReportSource: "LIVE" | "IMPORTED" | null = null;
+let deviceReportError: string | null = null;
 let deviceCheckRunning = false;
 const root = requireStudioRoot();
 
@@ -92,9 +96,30 @@ function openDemoProject(): void {
 
 async function runDeviceCheck(): Promise<void> {
   deviceCheckRunning = true;
+  deviceReportError = null;
   render();
-  deviceReport = await runBrowserDeviceVerification();
-  deviceCheckRunning = false;
+  try {
+    deviceReport = await runBrowserDeviceVerification();
+    deviceReportSource = "LIVE";
+  } catch (error) {
+    deviceReportError = error instanceof Error ? error.message : "Device check failed.";
+  } finally {
+    deviceCheckRunning = false;
+    render();
+  }
+}
+
+async function importDeviceReport(file: File): Promise<void> {
+  const validation = parseDeviceVerificationReport(await file.text());
+  if (!validation.ok) {
+    deviceReportError = validation.issues.join(" ");
+    render();
+    return;
+  }
+
+  deviceReport = validation.report;
+  deviceReportSource = "IMPORTED";
+  deviceReportError = null;
   render();
 }
 
@@ -111,18 +136,67 @@ function downloadDeviceReport(report: DeviceVerificationReport): void {
 function renderDeviceVerification(inspector: HTMLElement): void {
   inspector.append(text("h3", "Device verification"));
 
+  const controls = el("div", "device-check-controls");
   const runButton = el("button", "device-check-button");
   runButton.type = "button";
   runButton.textContent = deviceCheckRunning ? "Checking device…" : "Run device check";
   runButton.disabled = deviceCheckRunning;
   runButton.addEventListener("click", () => void runDeviceCheck());
-  inspector.append(runButton);
+
+  const fileInput = el("input", "device-report-input");
+  fileInput.type = "file";
+  fileInput.accept = ".json,application/json";
+  fileInput.dataset.deviceReportInput = "true";
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files?.[0];
+    if (file) void importDeviceReport(file);
+  });
+
+  const importButton = el("button", "device-report-import");
+  importButton.type = "button";
+  importButton.textContent = "Import device report";
+  importButton.addEventListener("click", () => fileInput.click());
+  controls.append(runButton, importButton, fileInput);
+  inspector.append(controls);
+
+  if (deviceReportError) {
+    const error = text("p", deviceReportError, "device-report-error");
+    error.setAttribute("role", "alert");
+    inspector.append(error);
+  }
 
   if (!deviceReport) return;
 
-  const summary = text("div", `Device check: ${deviceReport.summary}`, `device-summary summary-${deviceReport.summary.toLowerCase()}`);
+  const intake = analyzeDeviceVerificationReport(deviceReport);
+  const summary = text(
+    "div",
+    `Device check: ${deviceReport.summary}`,
+    `device-summary summary-${deviceReport.summary.toLowerCase()}`,
+  );
   summary.dataset.summary = deviceReport.summary;
   inspector.append(summary);
+
+  const mode = text(
+    "div",
+    `Compatibility: ${intake.mode}`,
+    `compatibility-mode mode-${intake.mode.toLowerCase()}`,
+  );
+  mode.dataset.compatibilityMode = intake.mode;
+  inspector.append(mode);
+
+  const meta = el("div", "device-report-meta");
+  meta.append(
+    text("span", deviceReportSource === "IMPORTED" ? "Imported report" : "Live browser"),
+    text("span", new Date(deviceReport.capturedAt).toLocaleString()),
+  );
+  inspector.append(meta);
+
+  const coverage = el("div", "device-report-coverage");
+  coverage.append(
+    text("span", `Required ${intake.requiredPassed}/${intake.requiredTotal}`),
+    text("span", `Optional ${intake.optionalPassed}/${intake.optionalTotal}`),
+  );
+  inspector.append(coverage, text("p", deviceReport.userAgent, "device-user-agent"));
 
   const list = el("ul", "device-check-list");
   for (const check of deviceReport.checks) {
