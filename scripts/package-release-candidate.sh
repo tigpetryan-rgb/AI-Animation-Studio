@@ -21,10 +21,12 @@ for required in \
   fi
 done
 
-if ! command -v zip >/dev/null 2>&1; then
-  echo "The 'zip' command is required to package the release candidate." >&2
-  exit 1
-fi
+for command in zip unzip sha256sum; do
+  if ! command -v "${command}" >/dev/null 2>&1; then
+    echo "The '${command}' command is required to package the release candidate." >&2
+    exit 1
+  fi
+done
 
 rm -rf "${PACKAGE_DIR}" "${ARCHIVE_PATH}" "${ARCHIVE_PATH}.sha256"
 mkdir -p "${PACKAGE_DIR}/studio-web"
@@ -48,7 +50,10 @@ find "${PACKAGE_DIR}" -type f -exec touch -d "@${SOURCE_DATE_EPOCH}" {} +
 )
 
 unzip -tq "${ARCHIVE_PATH}" >/dev/null
-sha256sum "${ARCHIVE_PATH}" > "${ARCHIVE_PATH}.sha256"
-sha256sum -c "${ARCHIVE_PATH}.sha256"
+(
+  cd "${RELEASE_DIR}"
+  sha256sum "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
+  sha256sum -c "${ARCHIVE_NAME}.sha256"
+)
 
 echo "Release candidate packaged at ${ARCHIVE_PATH}"
