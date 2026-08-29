@@ -74,3 +74,19 @@ test("installed shell reloads while Chromium is offline", async ({ page, context
     await context.setOffline(false);
   }
 });
+
+test("Studio produces a real device verification report", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Run device check" }).click();
+
+  const summary = page.locator(".device-summary");
+  await expect(summary).toBeVisible({ timeout: 20_000 });
+  expect(["READY", "DEGRADED"]).toContain(await summary.getAttribute("data-summary"));
+
+  await expect(page.locator('[data-check-id="secure-context"] strong')).toHaveText("PASS");
+  await expect(page.locator('[data-check-id="service-worker"] strong')).toHaveText("PASS");
+  await expect(page.locator('[data-check-id="opfs"] strong')).toHaveText("PASS");
+  await expect(page.locator('[data-check-id="indexeddb"] strong')).toHaveText("PASS");
+  await expect(page.locator('[data-check-id="wasm"] strong')).toHaveText("PASS");
+  await expect(page.getByRole("button", { name: "Download verification report" })).toBeVisible();
+});

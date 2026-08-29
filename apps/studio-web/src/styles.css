@@ -91,6 +91,28 @@ button:disabled { opacity: .55; cursor: default; }
 .kv-row strong { color: #d7deea; text-align: right; }
 .warning-list { margin: 0; padding-left: 18px; color: #aeb8c8; font-size: 11px; line-height: 1.5; }
 
+.device-check-button,
+.device-report-download { width: 100%; margin-top: 4px; }
+.device-summary {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid #2b3240;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.summary-ready { border-color: #476453; }
+.summary-degraded { border-color: #70623e; }
+.summary-failed { border-color: #704848; }
+.device-check-list { list-style: none; margin: 10px 0; padding: 0; display: grid; gap: 6px; }
+.device-check-list li { border: 1px solid #252c37; border-radius: 6px; padding: 7px 8px; background: #0d1015; }
+.check-headline { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; }
+.check-pass strong { color: #b8d7c1; }
+.check-fail strong { color: #e0b0b0; }
+.check-unavailable strong { color: #d6c28e; }
+.device-check-list p { margin: 4px 0 0; line-height: 1.35; }
+.verification-note { color: #717c8f; font-size: 10px; line-height: 1.4; }
+
 .timeline {
   min-height: 96px;
   display: grid;
