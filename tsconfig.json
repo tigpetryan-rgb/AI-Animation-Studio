@@ -21,6 +21,7 @@
     { "path": "./packages/resource-budget" },
     { "path": "./packages/production-autopilot" },
     { "path": "./packages/security-policy" },
-    { "path": "./packages/production-manifest" }
+    { "path": "./packages/production-manifest" },
+    { "path": "./packages/production-orchestrator" }
   ]
 }
