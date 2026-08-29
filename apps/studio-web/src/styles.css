@@ -57,7 +57,7 @@ button:disabled { opacity: .55; cursor: default; }
 .studio-body {
   min-height: 0;
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) 260px;
+  grid-template-columns: 220px minmax(0, 1fr) 280px;
 }
 
 .panel { padding: 14px; background: #101319; }
@@ -91,9 +91,13 @@ button:disabled { opacity: .55; cursor: default; }
 .kv-row strong { color: #d7deea; text-align: right; }
 .warning-list { margin: 0; padding-left: 18px; color: #aeb8c8; font-size: 11px; line-height: 1.5; }
 
+.device-check-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .device-check-button,
+.device-report-import,
 .device-report-download { width: 100%; margin-top: 4px; }
-.device-summary {
+.device-report-input { display: none; }
+.device-summary,
+.compatibility-mode {
   margin-top: 10px;
   padding: 8px 10px;
   border: 1px solid #2b3240;
@@ -101,9 +105,36 @@ button:disabled { opacity: .55; cursor: default; }
   font-size: 12px;
   font-weight: 700;
 }
-.summary-ready { border-color: #476453; }
-.summary-degraded { border-color: #70623e; }
-.summary-failed { border-color: #704848; }
+.summary-ready, .mode-full { border-color: #476453; }
+.summary-degraded, .mode-fallback { border-color: #70623e; }
+.summary-failed, .mode-blocked { border-color: #704848; }
+.device-report-meta,
+.device-report-coverage {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  color: #8f98a8;
+  font-size: 10px;
+}
+.device-report-coverage { color: #b3bdcc; }
+.device-user-agent {
+  margin: 8px 0 0;
+  color: #717c8f;
+  font-size: 9px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.device-report-error {
+  margin: 8px 0 0;
+  padding: 8px;
+  border: 1px solid #704848;
+  border-radius: 6px;
+  color: #e0b0b0;
+  background: #171113;
+  font-size: 10px;
+  line-height: 1.4;
+}
 .device-check-list { list-style: none; margin: 10px 0; padding: 0; display: grid; gap: 6px; }
 .device-check-list li { border: 1px solid #252c37; border-radius: 6px; padding: 7px 8px; background: #0d1015; }
 .check-headline { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; }
