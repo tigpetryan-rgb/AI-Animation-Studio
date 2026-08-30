@@ -456,7 +456,7 @@ function syncEditor(): void {
 function scheduleSync(): void {
   if (syncQueued) return;
   syncQueued = true;
-  queueMicrotask(syncEditor);
+  window.setTimeout(syncEditor, 0);
 }
 
 window.addEventListener("aistudio:movie-session-change", () => {
