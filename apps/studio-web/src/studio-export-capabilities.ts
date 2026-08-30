@@ -69,8 +69,17 @@ function aacEncoderConfig(profile: MovieExportProfile, plan: StudioExportPlan): 
   };
 }
 
+export function isWebKitStudioCodecProbeUnsafe(userAgent: string): boolean {
+  if (!/\bAppleWebKit\//.test(userAgent)) return false;
+  if (/\b(?:iPhone|iPad|iPod)\b/.test(userAgent)) return true;
+  return /\bVersion\/[\d.]+.*\bSafari\//.test(userAgent)
+    && !/\b(?:Chrome|Chromium|Edg|OPR)\//.test(userAgent);
+}
+
 export function browserStudioCodecCapabilityProbe(): StudioCodecCapabilityProbe | null {
   if (typeof VideoEncoder === "undefined" || typeof AudioEncoder === "undefined") return null;
+  const userAgent = typeof navigator === "undefined" ? "" : navigator.userAgent;
+  if (isWebKitStudioCodecProbeUnsafe(userAgent)) return null;
   return {
     async video(config) {
       try {
