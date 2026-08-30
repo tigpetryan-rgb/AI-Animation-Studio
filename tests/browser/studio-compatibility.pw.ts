@@ -1,5 +1,14 @@
 import { expect, test } from "@playwright/test";
 
+async function activateSelfReplacingControl(locator: import("@playwright/test").Locator): Promise<void> {
+  await expect(locator).toBeVisible();
+  await expect(locator).toBeEnabled();
+  await locator.evaluate((element) => {
+    if (!(element instanceof HTMLButtonElement)) throw new Error("Expected a button control.");
+    element.click();
+  });
+}
+
 test("Studio opens projects and gates export safely on this browser profile", async ({ page }) => {
   await page.goto("/");
 
@@ -11,7 +20,10 @@ test("Studio opens projects and gates export safely on this browser profile", as
   await expect(exportButton).toBeDisabled();
   await expect(saveButton).toBeDisabled();
 
-  await page.getByRole("button", { name: "Open local demo" }).click();
+  // These controls synchronously replace their own DOM subtree. DOM activation verifies the
+  // application click handler without relying on engine-specific pointer-action bookkeeping
+  // after the target node has been removed.
+  await activateSelfReplacingControl(page.getByRole("button", { name: "Open local demo" }));
 
   await expect(page.locator("[data-timeline-editor]")).toBeVisible();
   await expect(saveButton).toBeEnabled();
@@ -27,6 +39,6 @@ test("Studio opens projects and gates export safely on this browser profile", as
     await expect(page.locator("[data-export-mp4-status]")).toContainText("unavailable");
   }
 
-  await page.locator("[data-timeline-clip-id='action-shot']").click();
+  await activateSelfReplacingControl(page.locator("[data-timeline-clip-id='action-shot']"));
   await expect(page.locator("[data-timeline-selection]")).toContainText("action-shot");
 });
