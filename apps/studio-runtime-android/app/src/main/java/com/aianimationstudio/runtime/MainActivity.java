@@ -56,6 +56,9 @@ public final class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setSafeBrowsingEnabled(true);
+        settings.setSupportZoom(false);
+        settings.setBuiltInZoomControls(false);
+        settings.setDisplayZoomControls(false);
 
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, false);
         webView.addJavascriptInterface(new StudioRuntimeBridge(this), "StudioRuntimeAndroid");
