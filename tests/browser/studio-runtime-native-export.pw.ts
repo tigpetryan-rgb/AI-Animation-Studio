@@ -81,6 +81,11 @@ test("controlled Android Runtime streams the real MP4 export through the native 
     window.dispatchEvent(new CustomEvent("aistudio:runtime-ready"));
   });
 
+  // The Android product UI is chat-first. Production-engine validation enters its
+  // internal technical surface by event so no runtime/debug controls leak into the user UI.
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("aistudio:runtime-show-advanced")));
+  await expect(page.locator("html")).toHaveClass(/runtime-advanced-ui/);
+
   await page.getByRole("button", { name: "Open local demo", exact: true }).click();
   const exportButton = page.locator("[data-export-mp4-button]");
   const exportStatus = page.locator("[data-export-mp4-status]");
