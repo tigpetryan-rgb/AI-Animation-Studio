@@ -11,7 +11,8 @@ This app is the first controlled-runtime host for AI Animation Studio. It is int
    - runtime/device identity;
    - relevant hardware/media codec inventory;
    - chunked native file writes with SHA-256;
-   - native MP4 container/metadata/first-frame inspection.
+   - native MP4 container/metadata/first-frame inspection;
+   - bounded full-stream native decoder verification for saved MP4 tracks.
 5. Navigation outside the bundled Studio origin is blocked.
 
 The first certification target is **POCO X6 Pro 5G / Android 16**. No physical-device PASS is claimed by this branch until the APK is run on that real hardware and evidence is captured.
@@ -53,4 +54,6 @@ M55 certification evidence must eventually bind:
 - native save SHA-256;
 - native deterministic MP4 playback/decode verification.
 
-The current MP4 native method intentionally returns `deterministicPlaybackVerified=false`. It proves track presence, metadata, dimensions, duration and first-frame decode only. A later M55 step must add a decoder/playback gate before this can contribute to a production PASS.
+`inspectSavedMp4()` now fails closed through a bounded native decoder gate. It requires the saved video track, first-frame decode, decoder EOS, decoded output, monotonic presentation timestamps, and duration coverage; an audio track, when present, must independently pass the same EOS/timestamp/duration checks. Only then can `deterministicPlaybackVerified=true`.
+
+This gate proves that Android's native decoders can consume the saved media deterministically through EOS. It does **not** by itself prove real-time display/speaker A/V synchronization, and it is still not physical-device evidence until exercised on observed real hardware with the exact APK/Studio build identity.
