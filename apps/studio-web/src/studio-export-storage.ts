@@ -219,7 +219,12 @@ async function createNativeRuntimeStreamingExportFile(fileStem: string): Promise
     async finalize(mimeType, downloadName) {
       if (settled) throw new StudioExportStorageError("STORAGE_WRITE_FAILED", "Native streaming export file is already closed.");
       if (mimeType !== "video/mp4" || downloadName !== expectedDownloadName) {
-        await this.abort(new Error("Native streaming destination identity changed during export."));
+        settled = true;
+        try {
+          parseNativeResponse(bridge.abortFileWrite(sessionId), "abortFileWrite");
+        } catch {
+          // Destination mismatch is the primary error; abort is best effort here.
+        }
         throw new StudioExportStorageError("STORAGE_WRITE_FAILED", "Native streaming destination identity changed during export.");
       }
       settled = true;
