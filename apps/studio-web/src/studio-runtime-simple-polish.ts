@@ -48,6 +48,20 @@ function ensureStyles(): void {
   const style = document.createElement("style");
   style.dataset.runtimeSimplePolish = "true";
   style.textContent = `
+    html.runtime-simple-ui [data-runtime-left-menu] {
+      position: fixed;
+      left: 12px;
+      bottom: calc(max(10px, env(safe-area-inset-bottom)) + 78px);
+      z-index: 95;
+      border: 1px solid #30343d;
+      box-shadow: 0 10px 34px rgba(0, 0, 0, .32);
+    }
+
+    html.runtime-simple-ui[data-runtime-left-open="true"] [data-runtime-left-menu] {
+      pointer-events: none;
+      opacity: 0;
+    }
+
     html.runtime-simple-ui[data-runtime-project-open="true"] .project-file-controls {
       display: none !important;
     }
@@ -115,6 +129,12 @@ function ensureStyles(): void {
   document.head.append(style);
 }
 
+function exposeChatDrawerLauncher(): void {
+  const shell = document.querySelector<HTMLElement>("[data-runtime-chat-shell]");
+  const launcher = document.querySelector<HTMLButtonElement>("[data-runtime-left-menu]");
+  if (shell !== null && launcher !== null && launcher.parentElement !== shell) shell.append(launcher);
+}
+
 function simplifyTimelineControls(): void {
   const trimStart = document.querySelector<HTMLButtonElement>("[data-timeline-edit-action=\"trim-in\"]");
   const trimEnd = document.querySelector<HTMLButtonElement>("[data-timeline-edit-action=\"trim-out\"]");
@@ -159,6 +179,7 @@ function syncPolish(): void {
   syncQueued = false;
   if (window.AIStudioRuntime === undefined) return;
   ensureStyles();
+  exposeChatDrawerLauncher();
   simplifyTimelineControls();
   orderPrimaryActions();
   updateGuidance();
