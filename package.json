@@ -14,6 +14,7 @@
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run",
     "test:browser": "playwright test",
+    "test:browser:compat": "playwright test --config=playwright.compat.config.ts",
     "test:watch": "vitest",
     "release:manifest": "node scripts/create-release-manifest.mjs",
     "package:rc": "npm run build:web && npm run release:manifest && bash scripts/package-release-candidate.sh"
