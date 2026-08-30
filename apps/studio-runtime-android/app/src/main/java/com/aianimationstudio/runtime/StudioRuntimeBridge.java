@@ -179,7 +179,10 @@ public final class StudioRuntimeBridge {
             return errorJson("inspect-saved-mp4", error).toString();
         } finally {
             extractor.release();
-            metadata.release();
+            try {
+                metadata.release();
+            } catch (IOException ignored) {
+            }
         }
     }
 
