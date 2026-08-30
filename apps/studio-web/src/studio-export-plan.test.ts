@@ -49,7 +49,7 @@ describe("Studio export workload plan", () => {
   });
 
   it("warns before large in-memory jobs and blocks jobs beyond the current safety limit", () => {
-    const large = planStudioExport(sourceProfile, 20 * 60, {
+    const large = planStudioExport(sourceProfile, 5 * 60, {
       resolution: "1080p",
       frameRate: "30",
       quality: "high",
@@ -59,7 +59,7 @@ describe("Studio export workload plan", () => {
     expect(large.warning).not.toBeNull();
     expect(large.blockedReason).toBeNull();
 
-    const unsafe = planStudioExport(sourceProfile, 90 * 60, {
+    const unsafe = planStudioExport(sourceProfile, 20 * 60, {
       resolution: "1080p",
       frameRate: "30",
       quality: "high",
