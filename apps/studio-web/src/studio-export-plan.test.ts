@@ -27,6 +27,7 @@ describe("Studio export workload plan", () => {
     expect(plan.totalAudioFrames).toBe(192_000);
     expect(plan.videoBitrate).toBeGreaterThanOrEqual(400_000);
     expect(plan.audioBitrate).toBe(96_000);
+    expect(plan.storageMode).toBe("memory");
     expect(plan.blockedReason).toBeNull();
   });
 
@@ -67,5 +68,20 @@ describe("Studio export workload plan", () => {
     });
     expect(unsafe.estimatedOutputBytes).toBeGreaterThan(MAX_IN_MEMORY_EXPORT_BYTES);
     expect(unsafe.blockedReason).toContain("safety limit");
+  });
+
+  it("keeps multi-gigabyte disk-streamed jobs out of the in-memory safety cap", () => {
+    const longJob = planStudioExport(sourceProfile, 2 * 60 * 60, {
+      resolution: "1080p",
+      frameRate: "30",
+      quality: "high",
+      audioBitrate: "128",
+    }, "streaming");
+
+    expect(longJob.estimatedOutputBytes).toBeGreaterThan(10 * MAX_IN_MEMORY_EXPORT_BYTES);
+    expect(longJob.blockedReason).toBeNull();
+    expect(longJob.storageMode).toBe("streaming");
+    expect(longJob.estimatedPeakWorkingBytes).toBeLessThan(256 * 1024 * 1024);
+    expect(exportPlanSummary(longJob)).toContain("disk-streamed");
   });
 });
