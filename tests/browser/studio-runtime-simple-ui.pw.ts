@@ -44,6 +44,11 @@ test("controlled Android Runtime is chat-first and hides technical Studio panels
     expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
   }
+
+  const drawerLauncherBox = await page.getByLabel("Open chats menu").boundingBox();
+  expect(drawerLauncherBox).not.toBeNull();
+  expect(drawerLauncherBox?.x ?? Number.MAX_SAFE_INTEGER).toBeLessThanOrEqual(20);
+  expect((drawerLauncherBox?.y ?? 0) + (drawerLauncherBox?.height ?? 0)).toBeGreaterThan(700);
 });
 
 test("chat composer accepts prompt plus media and emits one orchestration event", async ({ page }) => {
