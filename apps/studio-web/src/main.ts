@@ -74,6 +74,7 @@ let performanceBenchmarkRunning = false;
 let persistenceReport: PersistenceStressReport | null = null;
 let persistenceError: string | null = null;
 let persistenceRunning = false;
+let shellRenderTimer: number | null = null;
 const root = requireStudioRoot();
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string): HTMLElementTagNameMap[K] {
@@ -100,9 +101,17 @@ function capabilityRows(): readonly [string, string][] {
   ];
 }
 
+function scheduleShellRender(): void {
+  if (shellRenderTimer !== null) return;
+  shellRenderTimer = window.setTimeout(() => {
+    shellRenderTimer = null;
+    render();
+  }, 0);
+}
+
 function switchWorkspace(workspace: StudioWorkspace): void {
   shellState = applyStudioShellAction(shellState, { type: "SWITCH_WORKSPACE", workspace }).state;
-  render();
+  scheduleShellRender();
 }
 
 function openDemoProject(): void {
@@ -110,7 +119,7 @@ function openDemoProject(): void {
     type: "OPEN_PROJECT",
     projectId: "local-demo-project",
   }).state;
-  render();
+  scheduleShellRender();
 }
 
 async function runDeviceCheck(): Promise<void> {
