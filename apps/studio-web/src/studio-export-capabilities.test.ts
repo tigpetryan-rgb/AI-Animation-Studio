@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isStudioExportSelectionSupported,
   probeStudioExportCapabilities,
+  resolveStudioExportAudioCodec,
   studioCapabilityKey,
   studioCompatibilitySummary,
   type StudioCodecCapabilityProbe,
@@ -40,10 +41,11 @@ describe("Studio export capability matrix", () => {
     expect(matrix.video[studioCapabilityKey("1080p", "30")]).toBe(false);
     expect(matrix.opusSupported).toBe(true);
     expect(matrix.aacSupported).toBe(false);
+    expect(resolveStudioExportAudioCodec(matrix, "auto")).toBe("opus");
     expect(isStudioExportSelectionSupported(matrix, DEFAULT_STUDIO_EXPORT_SETTINGS)).toBe(true);
   });
 
-  it("reports native AAC separately from the currently enabled Opus MP4 path", async () => {
+  it("prefers native AAC for Auto while keeping explicit Opus available", async () => {
     const probe: StudioCodecCapabilityProbe = {
       async video() { return true; },
       async audio() { return true; },
@@ -56,7 +58,28 @@ describe("Studio export capability matrix", () => {
     );
 
     expect(matrix.aacSupported).toBe(true);
-    expect(studioCompatibilitySummary(matrix)).toContain("native AAC is also available");
+    expect(matrix.opusSupported).toBe(true);
+    expect(resolveStudioExportAudioCodec(matrix, "auto")).toBe("aac");
+    expect(resolveStudioExportAudioCodec(matrix, "aac")).toBe("aac");
+    expect(resolveStudioExportAudioCodec(matrix, "opus")).toBe("opus");
+    expect(studioCompatibilitySummary(matrix)).toContain("AAC is selected");
+  });
+
+  it("rejects an explicitly requested codec when that encoder is unavailable", async () => {
+    const probe: StudioCodecCapabilityProbe = {
+      async video() { return true; },
+      async audio(config) { return config.codec === "opus"; },
+    };
+    const matrix = await probeStudioExportCapabilities(
+      sourceProfile,
+      4,
+      DEFAULT_STUDIO_EXPORT_SETTINGS,
+      probe,
+    );
+
+    expect(resolveStudioExportAudioCodec(matrix, "aac")).toBeNull();
+    expect(isStudioExportSelectionSupported(matrix, DEFAULT_STUDIO_EXPORT_SETTINGS, "aac")).toBe(false);
+    expect(studioCompatibilitySummary(matrix, "aac")).toContain("unavailable");
   });
 
   it("fails closed when WebCodecs is unavailable", async () => {
@@ -69,6 +92,8 @@ describe("Studio export capability matrix", () => {
 
     expect(matrix.webCodecsAvailable).toBe(false);
     expect(matrix.opusSupported).toBe(false);
+    expect(matrix.aacSupported).toBe(false);
+    expect(resolveStudioExportAudioCodec(matrix)).toBeNull();
     expect(matrix.video[studioCapabilityKey("source", "source")]).toBe(false);
   });
 });

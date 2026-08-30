@@ -1,4 +1,5 @@
 import {
+  AV_MP4_AAC_AUDIO_CODEC,
   AV_MP4_AUDIO_CODEC,
   AV_MP4_OPUS_SAMPLE_RATE,
   AV_MP4_VIDEO_CODEC,
@@ -13,6 +14,8 @@ import {
 import type { MovieExportProfile } from "./studio-movie-session";
 
 export type StudioCapabilityKey = `${ExportResolutionPreset}:${ExportFrameRatePreset}`;
+export type StudioAudioCodecPreference = "auto" | "aac" | "opus";
+export type StudioResolvedAudioCodec = "aac" | "opus";
 
 export interface StudioCodecCapabilityProbe {
   video(config: VideoEncoderConfig): Promise<boolean>;
@@ -59,7 +62,7 @@ function opusEncoderConfig(profile: MovieExportProfile, plan: StudioExportPlan):
 
 function aacEncoderConfig(profile: MovieExportProfile, plan: StudioExportPlan): AudioEncoderConfig {
   return {
-    codec: "mp4a.40.2",
+    codec: AV_MP4_AAC_AUDIO_CODEC,
     sampleRate: profile.sampleRate,
     numberOfChannels: profile.numberOfChannels,
     bitrate: plan.audioBitrate,
@@ -125,16 +128,43 @@ export async function probeStudioExportCapabilities(
   });
 }
 
+export function resolveStudioExportAudioCodec(
+  matrix: StudioExportCapabilityMatrix,
+  preference: StudioAudioCodecPreference = "auto",
+): StudioResolvedAudioCodec | null {
+  if (preference === "aac") return matrix.aacSupported ? "aac" : null;
+  if (preference === "opus") return matrix.opusSupported ? "opus" : null;
+  if (matrix.aacSupported) return "aac";
+  if (matrix.opusSupported) return "opus";
+  return null;
+}
+
 export function isStudioExportSelectionSupported(
   matrix: StudioExportCapabilityMatrix,
   settings: StudioExportSettings,
+  audioCodecPreference: StudioAudioCodecPreference = "auto",
 ): boolean {
-  return matrix.opusSupported && matrix.video[studioCapabilityKey(settings.resolution, settings.frameRate)] === true;
+  return resolveStudioExportAudioCodec(matrix, audioCodecPreference) !== null
+    && matrix.video[studioCapabilityKey(settings.resolution, settings.frameRate)] === true;
 }
 
-export function studioCompatibilitySummary(matrix: StudioExportCapabilityMatrix): string {
+export function studioCompatibilitySummary(
+  matrix: StudioExportCapabilityMatrix,
+  preference: StudioAudioCodecPreference = "auto",
+): string {
   if (!matrix.webCodecsAvailable) return "WebCodecs export is unavailable on this browser.";
-  if (!matrix.opusSupported) return "Native Opus encoding is unavailable on this browser.";
-  if (matrix.aacSupported) return "H.264 + Opus is ready; native AAC is also available for a future compatibility mux path.";
-  return "H.264 + Opus is the available native MP4 path; native AAC is unavailable on this browser.";
+  const resolved = resolveStudioExportAudioCodec(matrix, preference);
+  if (resolved === null) {
+    if (preference === "aac") return "Native AAC-LC encoding is unavailable on this browser; choose Auto or Opus if available.";
+    if (preference === "opus") return "Native Opus encoding is unavailable on this browser; choose Auto or AAC if available.";
+    return "Neither native AAC-LC nor Opus encoding is available on this browser.";
+  }
+  if (resolved === "aac") {
+    return matrix.opusSupported
+      ? "H.264 + AAC is selected for wider MP4 compatibility; H.264 + Opus remains available as fallback."
+      : "H.264 + AAC is the available native MP4 path on this browser.";
+  }
+  return matrix.aacSupported
+    ? "H.264 + Opus is selected; native AAC is also available for wider MP4 compatibility."
+    : "H.264 + Opus is the available native MP4 path; native AAC is unavailable on this browser.";
 }

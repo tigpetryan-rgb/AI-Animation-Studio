@@ -1,14 +1,18 @@
 import { rationalTime } from "@aistudio/core-time";
 import {
+  exportAvcAacFragmentedMp4,
   exportAvcOpusFragmentedMp4,
   exportAvcOpusMp4,
 } from "@aistudio/media-export/mp4";
 import {
   isStudioExportSelectionSupported,
   probeStudioExportCapabilities,
+  resolveStudioExportAudioCodec,
   studioCapabilityKey,
   studioCompatibilitySummary,
+  type StudioAudioCodecPreference,
   type StudioExportCapabilityMatrix,
+  type StudioResolvedAudioCodec,
 } from "./studio-export-capabilities";
 import { drawMovieTimelineFrame } from "./studio-frame-renderer";
 import {
@@ -42,7 +46,8 @@ import {
   type StudioMovieSession,
 } from "./studio-movie-session";
 
-const EXPORT_AUDIO_CHUNK_FRAMES = 960;
+const OPUS_AUDIO_CHUNK_FRAMES = 960;
+const AAC_AUDIO_CHUNK_FRAMES = 1024;
 const RESOLUTION_PRESETS: readonly ExportResolutionPreset[] = ["source", "720p", "1080p"];
 const FRAME_RATE_PRESETS: readonly ExportFrameRatePreset[] = ["source", "24", "30"];
 
@@ -63,6 +68,7 @@ let state: ExportPanelState = {
   message: "Open the local demo project to export or save its timeline media.",
 };
 let settings: StudioExportSettings = { ...DEFAULT_STUDIO_EXPORT_SETTINGS };
+let audioCodecPreference: StudioAudioCodecPreference = "auto";
 let activeExportController: AbortController | null = null;
 let capabilityMatrix: StudioExportCapabilityMatrix | null = null;
 let capabilitySignature = "";
@@ -92,6 +98,16 @@ function safeFileStem(value: string): string {
     .replace(/[^a-z0-9._-]+/g, "-")
     .replace(/^-+|-+$/g, "");
   return stem.length > 0 ? stem : "aistudio-project";
+}
+
+function concatByteParts(parts: readonly Uint8Array[], totalBytes: number): Uint8Array {
+  const output = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const part of parts) {
+    output.set(part, offset);
+    offset += part.byteLength;
+  }
+  return output;
 }
 
 function downloadBytes(bytes: Uint8Array, mimeType: string, filename: string): void {
@@ -226,19 +242,14 @@ function requestCancel(): void {
   updateState({ message: "Cancelling export…" });
 }
 
+function codecLabel(codec: StudioResolvedAudioCodec): string {
+  return codec === "aac" ? "AAC" : "Opus";
+}
+
 async function exportMovieTimeline(session: StudioMovieSession): Promise<void> {
   const plan = currentPlan(session);
   if (plan.blockedReason !== null) {
     updateState({ phase: "ERROR", operation: "NONE", progress: 0, message: plan.blockedReason });
-    return;
-  }
-  if (session.exportProfile.sampleRate !== 48_000) {
-    updateState({
-      phase: "ERROR",
-      operation: "NONE",
-      progress: 0,
-      message: "Current native MP4 audio path requires a 48 kHz project sample rate.",
-    });
     return;
   }
 
@@ -248,12 +259,22 @@ async function exportMovieTimeline(session: StudioMovieSession): Promise<void> {
     settings,
   );
   capabilityMatrix = matrix;
-  if (!isStudioExportSelectionSupported(matrix, settings)) {
+  const resolvedAudioCodec = resolveStudioExportAudioCodec(matrix, audioCodecPreference);
+  if (resolvedAudioCodec === null || !isStudioExportSelectionSupported(matrix, settings, audioCodecPreference)) {
     updateState({
       phase: "ERROR",
       operation: "NONE",
       progress: 0,
-      message: "This device cannot encode the selected H.264 / Opus export profile. Choose an enabled resolution/frame-rate preset.",
+      message: "This device cannot encode the selected H.264 / audio codec export profile. Choose an enabled resolution, frame-rate, or audio codec option.",
+    });
+    return;
+  }
+  if (resolvedAudioCodec === "opus" && session.exportProfile.sampleRate !== 48_000) {
+    updateState({
+      phase: "ERROR",
+      operation: "NONE",
+      progress: 0,
+      message: "The Opus MP4 path requires a 48 kHz project sample rate. Choose AAC if this device supports it.",
     });
     return;
   }
@@ -274,7 +295,7 @@ async function exportMovieTimeline(session: StudioMovieSession): Promise<void> {
     phase: "RUNNING",
     operation: "EXPORT",
     progress: 1,
-    message: `Preflight passed · ${exportPlanSummary(plan)}`,
+    message: `Preflight passed · H.264 + ${codecLabel(resolvedAudioCodec)} · ${exportPlanSummary(plan)}`,
   });
 
   try {
@@ -290,7 +311,7 @@ async function exportMovieTimeline(session: StudioMovieSession): Promise<void> {
     throwIfCancelled(signal);
     updateState({
       progress: 8,
-      message: `Decoded media · starting ${width}×${height} @ ${frameRate} fps encode…`,
+      message: `Decoded media · starting ${width}×${height} @ ${frameRate} fps H.264 + ${codecLabel(resolvedAudioCodec)} encode…`,
     });
 
     const canvas = new OffscreenCanvas(width, height);
@@ -298,6 +319,7 @@ async function exportMovieTimeline(session: StudioMovieSession): Promise<void> {
     if (context === null) throw new Error("2D canvas context is unavailable.");
 
     const media = preparedMedia;
+    const audioChunkFrames = resolvedAudioCodec === "aac" ? AAC_AUDIO_CHUNK_FRAMES : OPUS_AUDIO_CHUNK_FRAMES;
     const yieldEveryVideoFrames = Math.max(1, Math.round(frameRate / 4));
     const yieldEveryAudioChunks = 10;
     const createFrame = async (index: number, timestampUs: number, durationUs: number): Promise<VideoFrame> => {
@@ -325,7 +347,7 @@ async function exportMovieTimeline(session: StudioMovieSession): Promise<void> {
       frameCountForChunk: number,
       timestampUs: number,
     ): Promise<AudioData> => {
-      const chunkIndex = Math.floor(startFrame / EXPORT_AUDIO_CHUNK_FRAMES);
+      const chunkIndex = Math.floor(startFrame / audioChunkFrames);
       if (chunkIndex % yieldEveryAudioChunks === 0) await yieldToBrowser(signal);
       else throwIfCancelled(signal);
 
@@ -346,7 +368,7 @@ async function exportMovieTimeline(session: StudioMovieSession): Promise<void> {
       const audioProgress = (startFrame + frameCountForChunk) / plan.totalAudioFrames;
       updateState({
         progress: Math.max(state.progress, 70 + Math.round(audioProgress * 25)),
-        message: "Mixing decoded timeline audio…",
+        message: `Mixing decoded timeline audio for ${codecLabel(resolvedAudioCodec)}…`,
       });
       return new AudioData({
         format: "f32",
@@ -362,25 +384,47 @@ async function exportMovieTimeline(session: StudioMovieSession): Promise<void> {
     if (plan.storageMode === "streaming") {
       updateState({
         progress: 8,
-        message: `Opening disk-backed streaming export · ${exportPlanSummary(plan)}`,
+        message: `Checking local disk capacity · ${exportPlanSummary(plan)}`,
       });
-      streamingFile = await createStudioStreamingExportFile(safeFileStem(projectId));
-      const exported = await exportAvcOpusFragmentedMp4({
-        width,
-        height,
-        frameRate,
-        frameCount: plan.frameCount,
-        videoBitrate: plan.videoBitrate,
-        numberOfChannels,
-        totalAudioFrames: plan.totalAudioFrames,
-        audioChunkFrames: EXPORT_AUDIO_CHUNK_FRAMES,
-        audioBitrate: plan.audioBitrate,
-        fragmentDurationSeconds: 1,
-        createFrame,
-        createAudioData,
-        sink: streamingFile.sink,
-        signal,
-      });
+      streamingFile = await createStudioStreamingExportFile(safeFileStem(projectId), plan.estimatedOutputBytes);
+      if (streamingFile.budget !== null) {
+        updateState({ progress: 8, message: `${streamingFile.budget.message} Starting H.264 + ${codecLabel(resolvedAudioCodec)} fragments…` });
+      }
+
+      const exported = resolvedAudioCodec === "aac"
+        ? await exportAvcAacFragmentedMp4({
+          width,
+          height,
+          frameRate,
+          frameCount: plan.frameCount,
+          videoBitrate: plan.videoBitrate,
+          sampleRate,
+          numberOfChannels,
+          totalAudioFrames: plan.totalAudioFrames,
+          audioChunkFrames,
+          audioBitrate: plan.audioBitrate,
+          fragmentDurationSeconds: 1,
+          createFrame,
+          createAudioData,
+          sink: streamingFile.sink,
+          signal,
+        })
+        : await exportAvcOpusFragmentedMp4({
+          width,
+          height,
+          frameRate,
+          frameCount: plan.frameCount,
+          videoBitrate: plan.videoBitrate,
+          numberOfChannels,
+          totalAudioFrames: plan.totalAudioFrames,
+          audioChunkFrames,
+          audioBitrate: plan.audioBitrate,
+          fragmentDurationSeconds: 1,
+          createFrame,
+          createAudioData,
+          sink: streamingFile.sink,
+          signal,
+        });
 
       throwIfCancelled(signal);
       updateState({ progress: 98, message: "Finalizing disk-streamed MP4 download…" });
@@ -390,7 +434,42 @@ async function exportMovieTimeline(session: StudioMovieSession): Promise<void> {
         phase: "SUCCESS",
         operation: "NONE",
         progress: 100,
-        message: `MP4 ready · ${width}×${height} @ ${frameRate} fps · disk-streamed ${Math.round(file.size / 1024)} KiB · ${exported.fragmentsWritten} fragments · shared Preview/Export renderer · ${media.images.size} decoded image · ${media.videos.size} decoded video · ${media.audio.size} decoded audio · ${exported.encodedVideoChunks} video chunks · ${exported.encodedAudioChunks} audio chunks`,
+        message: `MP4 ready · H.264 + ${codecLabel(resolvedAudioCodec)} · ${width}×${height} @ ${frameRate} fps · disk-streamed ${Math.round(file.size / 1024)} KiB · ${exported.fragmentsWritten} fragments · shared Preview/Export renderer · ${media.images.size} decoded image · ${media.videos.size} decoded video · ${media.audio.size} decoded audio · ${exported.encodedVideoChunks} video chunks · ${exported.encodedAudioChunks} audio chunks`,
+      });
+    } else if (resolvedAudioCodec === "aac") {
+      const parts: Uint8Array[] = [];
+      let totalBytes = 0;
+      const exported = await exportAvcAacFragmentedMp4({
+        width,
+        height,
+        frameRate,
+        frameCount: plan.frameCount,
+        videoBitrate: plan.videoBitrate,
+        sampleRate,
+        numberOfChannels,
+        totalAudioFrames: plan.totalAudioFrames,
+        audioChunkFrames,
+        audioBitrate: plan.audioBitrate,
+        fragmentDurationSeconds: 1,
+        createFrame,
+        createAudioData,
+        sink: {
+          write(bytes) {
+            const copy = bytes.slice();
+            parts.push(copy);
+            totalBytes += copy.byteLength;
+          },
+        },
+        signal,
+      });
+      throwIfCancelled(signal);
+      updateState({ progress: 98, message: "Preparing in-memory AAC MP4 download…" });
+      downloadBytes(concatByteParts(parts, totalBytes), exported.mimeType, filename);
+      updateState({
+        phase: "SUCCESS",
+        operation: "NONE",
+        progress: 100,
+        message: `MP4 ready · H.264 + AAC · ${width}×${height} @ ${frameRate} fps · in-memory fragmented fallback · ${exported.fragmentsWritten} fragments · shared Preview/Export renderer · ${media.images.size} decoded image · ${media.videos.size} decoded video · ${media.audio.size} decoded audio`,
       });
     } else {
       const exported = await exportAvcOpusMp4({
@@ -401,7 +480,7 @@ async function exportMovieTimeline(session: StudioMovieSession): Promise<void> {
         videoBitrate: plan.videoBitrate,
         numberOfChannels,
         totalAudioFrames: plan.totalAudioFrames,
-        audioChunkFrames: EXPORT_AUDIO_CHUNK_FRAMES,
+        audioChunkFrames,
         audioBitrate: plan.audioBitrate,
         createFrame,
         createAudioData,
@@ -414,7 +493,7 @@ async function exportMovieTimeline(session: StudioMovieSession): Promise<void> {
         phase: "SUCCESS",
         operation: "NONE",
         progress: 100,
-        message: `MP4 ready · ${width}×${height} @ ${frameRate} fps · in-memory fallback · shared Preview/Export renderer · ${media.images.size} decoded image · ${media.videos.size} decoded video · ${media.audio.size} decoded audio · ${exported.encodedVideoChunks} video chunks · ${exported.encodedAudioChunks} audio chunks`,
+        message: `MP4 ready · H.264 + Opus · ${width}×${height} @ ${frameRate} fps · in-memory fallback · shared Preview/Export renderer · ${media.images.size} decoded image · ${media.videos.size} decoded video · ${media.audio.size} decoded audio · ${exported.encodedVideoChunks} video chunks · ${exported.encodedAudioChunks} audio chunks`,
       });
     }
   } catch (error) {
@@ -424,7 +503,7 @@ async function exportMovieTimeline(session: StudioMovieSession): Promise<void> {
         phase: "CANCELLED",
         operation: "NONE",
         progress: 0,
-        message: "Export cancelled. No MP4 was downloaded.",
+        message: "Export cancelled. No MP4 was downloaded and the temporary disk file was removed.",
       });
     } else {
       updateState({
@@ -541,7 +620,23 @@ function ensurePanel(assets: HTMLElement): HTMLElement {
     invalidateCapabilities();
     syncExportPanel();
   });
-  settingsGrid.append(resolution.wrapper, frameRate.wrapper, quality.wrapper, audio.wrapper);
+
+  const audioCodec = createSettingSelect("Audio codec", "exportAudioCodecSelect");
+  appendOption(audioCodec.select, "auto", "Auto compatibility");
+  appendOption(audioCodec.select, "aac", "AAC (widest MP4 compatibility)");
+  appendOption(audioCodec.select, "opus", "Opus");
+  audioCodec.select.addEventListener("change", () => {
+    audioCodecPreference = audioCodec.select.value as StudioAudioCodecPreference;
+    syncExportPanel();
+  });
+
+  settingsGrid.append(
+    resolution.wrapper,
+    frameRate.wrapper,
+    quality.wrapper,
+    audio.wrapper,
+    audioCodec.wrapper,
+  );
 
   const planSummary = document.createElement("p");
   planSummary.className = "export-plan-summary muted";
@@ -618,10 +713,11 @@ function syncExportPanel(): void {
   const frameRate = panel.querySelector<HTMLSelectElement>("[data-export-frame-rate-select]");
   const quality = panel.querySelector<HTMLSelectElement>("[data-export-quality-select]");
   const audio = panel.querySelector<HTMLSelectElement>("[data-export-audio-bitrate-select]");
+  const audioCodec = panel.querySelector<HTMLSelectElement>("[data-export-audio-codec-select]");
   if (
     exportButton === null || cancelButton === null || saveButton === null || progress === null
     || status === null || summary === null || planSummary === null || compatibility === null
-    || resolution === null || frameRate === null || quality === null || audio === null
+    || resolution === null || frameRate === null || quality === null || audio === null || audioCodec === null
   ) return;
 
   const session = currentMovieSession();
@@ -637,7 +733,8 @@ function syncExportPanel(): void {
   frameRate.value = settings.frameRate;
   quality.value = settings.quality;
   audio.value = settings.audioBitrate;
-  for (const control of [resolution, frameRate, quality, audio]) control.disabled = running || session === null;
+  audioCodec.value = audioCodecPreference;
+  for (const control of [resolution, frameRate, quality, audio, audioCodec]) control.disabled = running || session === null;
 
   if (capabilityMatrix !== null && session !== null && !running) {
     for (const option of Array.from(resolution.options)) {
@@ -650,10 +747,23 @@ function syncExportPanel(): void {
       option.disabled = !frameRateAvailable(capabilityMatrix, preset);
       option.dataset.codecSupported = String(!option.disabled);
     }
+    for (const option of Array.from(audioCodec.options)) {
+      const preference = option.value as StudioAudioCodecPreference;
+      const supported = preference === "auto"
+        ? capabilityMatrix.aacSupported || capabilityMatrix.opusSupported
+        : preference === "aac"
+          ? capabilityMatrix.aacSupported
+          : capabilityMatrix.opusSupported;
+      option.disabled = !supported;
+      option.dataset.codecSupported = String(supported);
+    }
   }
 
+  const resolvedAudioCodec = capabilityMatrix === null
+    ? null
+    : resolveStudioExportAudioCodec(capabilityMatrix, audioCodecPreference);
   const selectedCapabilitySupported = capabilityMatrix !== null
-    && isStudioExportSelectionSupported(capabilityMatrix, settings);
+    && isStudioExportSelectionSupported(capabilityMatrix, settings, audioCodecPreference);
   exportButton.disabled = session === null
     || running
     || plan?.blockedReason !== null
@@ -703,22 +813,24 @@ function syncExportPanel(): void {
   if (capabilityMatrix === null) {
     setText(compatibility, "Checking this device's H.264 / Opus / AAC encoder capabilities…");
     compatibility.dataset.exportSelectedSupported = "pending";
+    delete compatibility.dataset.exportResolvedAudioCodec;
   } else {
-    setText(compatibility, studioCompatibilitySummary(capabilityMatrix));
+    setText(compatibility, studioCompatibilitySummary(capabilityMatrix, audioCodecPreference));
     compatibility.dataset.exportOpusSupported = String(capabilityMatrix.opusSupported);
     compatibility.dataset.exportAacSupported = String(capabilityMatrix.aacSupported);
     compatibility.dataset.exportSelectedSupported = String(selectedCapabilitySupported);
+    compatibility.dataset.exportResolvedAudioCodec = resolvedAudioCodec ?? "none";
   }
 
   if (running || state.phase !== "IDLE") {
     setText(status, state.message);
   } else if (capabilityMatrix === null) {
     setText(status, "Timeline ready · checking this device's export capabilities…");
-  } else if (!selectedCapabilitySupported) {
-    setText(status, "The selected export profile is unavailable on this device. Choose an enabled resolution/frame-rate combination.");
+  } else if (!selectedCapabilitySupported || resolvedAudioCodec === null) {
+    setText(status, "The selected export profile is unavailable on this device. Choose an enabled resolution, frame-rate, or audio codec option.");
   } else {
     const storage = plan?.storageMode === "streaming" ? "disk-streamed" : "in-memory fallback";
-    setText(status, `Timeline ready: ${storage} MP4 export is available, or save editable .aistudio.`);
+    setText(status, `Timeline ready: H.264 + ${codecLabel(resolvedAudioCodec)} ${storage} MP4 export is available, or save editable .aistudio.`);
   }
 }
 
