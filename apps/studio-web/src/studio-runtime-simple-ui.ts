@@ -99,9 +99,11 @@ function loadState(): ChatState {
       typeof project === "object" && project !== null && typeof (project as ChatProject).id === "string"
     ));
     if (chats.length === 0) return defaultState();
+    const firstChat = chats[0];
+    if (firstChat === undefined) return defaultState();
     const activeChatId = typeof parsed.activeChatId === "string" && chats.some((chat) => chat.id === parsed.activeChatId)
       ? parsed.activeChatId
-      : chats[0].id;
+      : firstChat.id;
     return { activeChatId, chats, projects };
   } catch {
     return defaultState();
@@ -138,7 +140,8 @@ function mediaFromFiles(files: File[]): MediaAttachment[] {
 function chatTitle(prompt: string, files: File[]): string {
   const trimmed = prompt.trim();
   if (trimmed.length > 0) return trimmed.length > 44 ? `${trimmed.slice(0, 41)}…` : trimmed;
-  if (files.length > 0) return files[0].name;
+  const firstFile = files[0];
+  if (firstFile !== undefined) return firstFile.name;
   return "New chat";
 }
 
