@@ -11,3 +11,11 @@ Thumbs.db
 *.aistudio
 .cache/
 release/
+
+# M55 Android Runtime local/generated state
+apps/studio-runtime-android/.gradle/
+apps/studio-runtime-android/**/build/
+apps/studio-runtime-android/local.properties
+apps/studio-runtime-android/.idea/
+apps/studio-runtime-android/*.iml
+apps/studio-runtime-android/gradle/wrapper/gradle-wrapper.jar
