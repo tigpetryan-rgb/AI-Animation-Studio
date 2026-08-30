@@ -51,10 +51,15 @@ function ensureStyles(): void {
     html.runtime-simple-ui [data-runtime-left-menu] {
       position: fixed;
       left: 12px;
-      bottom: calc(max(10px, env(safe-area-inset-bottom)) + 78px);
+      top: max(8px, env(safe-area-inset-top));
+      bottom: auto;
       z-index: 95;
       border: 1px solid #30343d;
       box-shadow: 0 10px 34px rgba(0, 0, 0, .32);
+    }
+
+    html.runtime-simple-ui [data-runtime-chat-header] {
+      padding-left: 68px;
     }
 
     html.runtime-simple-ui[data-runtime-left-open="true"] [data-runtime-left-menu] {
