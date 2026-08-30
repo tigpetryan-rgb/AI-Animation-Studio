@@ -2,9 +2,9 @@ name: Foundation CI
 
 on:
   push:
-    branches: [main, "foundation/**", "m54/physical-device-export-evidence"]
+    branches: [main, "foundation/**", "m54/physical-device-export-evidence", "m55/**"]
   pull_request:
-    branches: [main, "m51-53/production-validation"]
+    branches: [main, "m51-53/production-validation", "m54/physical-device-export-evidence"]
 
 jobs:
   verify:
@@ -19,6 +19,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android 16 platform
+        run: yes | sdkmanager "platforms;android-36"
 
       - name: Install dependencies
         run: npm install
@@ -41,6 +53,24 @@ jobs:
 
       - name: Build Studio Web
         run: npm run build:web
+
+      - name: Build Android controlled runtime
+        working-directory: apps/studio-runtime-android
+        run: |
+          ./gradlew :app:assembleDebug \
+            -PstudioCommitSha="${AISTUDIO_SOURCE_SHA}" \
+            -PstudioSourceDate="${AISTUDIO_SOURCE_DATE}" \
+            -PruntimeVersion="0.1.0-ci+${AISTUDIO_SOURCE_SHA:0:12}" \
+            --no-daemon
+          test -s app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload Android runtime artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-runtime-android-${{ env.AISTUDIO_SOURCE_SHA }}
+          path: apps/studio-runtime-android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium firefox webkit
