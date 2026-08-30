@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("Studio decodes image, video and audio media, exports MP4, and saves editable project", async ({ page }) => {
+test("Studio edits Timeline, previews shared media, relinks, reopens, and exports MP4", async ({ page }) => {
   const mediaRequests: string[] = [];
   page.on("request", (request) => {
     const url = new URL(request.url());
@@ -13,53 +13,62 @@ test("Studio decodes image, video and audio media, exports MP4, and saves editab
   const saveButton = page.locator("[data-save-aistudio-button]");
   const exportStatus = page.locator("[data-export-mp4-status]");
   const timelineSummary = page.locator("[data-export-timeline-summary]");
+  const projectStatus = page.locator("[data-project-file-status]");
 
   await expect(exportButton).toBeVisible();
   await expect(exportButton).toBeDisabled();
   await expect(saveButton).toBeDisabled();
-  await expect(exportStatus).toContainText("Open the local demo project");
+  await expect(page.locator("[data-open-aistudio-button]")).toBeVisible();
 
   await page.getByRole("button", { name: "Open local demo" }).click();
+
   await expect(exportButton).toBeEnabled();
   await expect(saveButton).toBeEnabled();
-  await expect(exportButton).toHaveText("Export media MP4");
   await expect(timelineSummary).toHaveAttribute("data-timeline-id", "local-demo-timeline");
   await expect(timelineSummary).toHaveAttribute("data-timeline-duration-seconds", "4");
   await expect(timelineSummary).toHaveAttribute("data-image-asset-count", "1");
   await expect(timelineSummary).toHaveAttribute("data-video-asset-count", "1");
   await expect(timelineSummary).toHaveAttribute("data-audio-asset-count", "2");
-  await expect(timelineSummary).toContainText("2 video clips");
-  await expect(timelineSummary).toContainText("2 audio clips");
 
-  const mp4DownloadPromise = page.waitForEvent("download");
-  await exportButton.click();
-  const mp4Download = await mp4DownloadPromise;
+  const editor = page.locator("[data-timeline-editor]");
+  const previewStatus = page.locator("[data-timeline-preview-status]");
+  await expect(editor).toBeVisible();
+  await expect(page.locator("[data-timeline-track-id='picture']")).toBeVisible();
+  await expect(page.locator("[data-timeline-track-id='dialogue-music']")).toBeVisible();
+  await expect(page.locator("[data-timeline-clip-id='opening-shot']")).toBeVisible();
+  await expect(page.locator("[data-timeline-clip-id='action-shot']")).toBeVisible();
+  await expect(previewStatus).toHaveAttribute("data-preview-phase", "READY", { timeout: 15_000 });
+  await expect(previewStatus).toContainText("Opening shot");
+  await expect(previewStatus).toContainText("Opening audio");
 
-  expect(mediaRequests).toContain("/demo-media/opening-shot.svg");
-  expect(mediaRequests).toContain("/demo-media/action-shot.webm.b64");
-  expect(mediaRequests).toContain("/demo-media/opening-tone.ogg.b64");
-  expect(mediaRequests).toContain("/demo-media/action-tone.ogg.b64");
-  expect(mp4Download.suggestedFilename()).toBe("local-demo-project-timeline.mp4");
-  const mp4Stream = await mp4Download.createReadStream();
-  if (mp4Stream === null) throw new Error("MP4 download stream was unavailable.");
+  await page.locator("[data-timeline-clip-id='action-shot']").click();
+  await expect(page.locator("[data-timeline-selection]")).toContainText("action-shot");
+  await expect(previewStatus).toContainText("Action video", { timeout: 15_000 });
+  await expect(previewStatus).toContainText("Action audio");
 
-  const mp4Chunks: Buffer[] = [];
-  for await (const chunk of mp4Stream) mp4Chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  const mp4Bytes = Buffer.concat(mp4Chunks);
-  expect(mp4Bytes.byteLength).toBeGreaterThan(1_000);
-  expect(mp4Bytes.subarray(4, 8).toString("ascii")).toBe("ftyp");
+  await page.locator("[data-timeline-edit-action='slip-forward']").click();
+  await expect(page.locator("[data-timeline-selection]")).toContainText("source 0.58s");
 
-  await expect(exportStatus).toHaveAttribute("data-export-phase", "SUCCESS");
-  await expect(exportStatus).toContainText("MP4 ready");
-  await expect(exportStatus).toContainText("1 decoded image");
-  await expect(exportStatus).toContainText("1 decoded video");
-  await expect(exportStatus).toContainText("2 decoded audio");
-  await expect(page.locator("[data-export-mp4-progress]")).toHaveJSProperty("value", 100);
+  const assetSelect = page.locator("[data-relink-asset-select]");
+  await assetSelect.selectOption("visual-opening");
+  const replacementSvg = Buffer.from(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#263238"/><circle cx="160" cy="90" r="54" fill="#fafafa"/></svg>',
+  );
+  await page.locator("[data-relink-media-input]").setInputFiles({
+    name: "replacement-opening.svg",
+    mimeType: "image/svg+xml",
+    buffer: replacementSvg,
+  });
+  await expect(projectStatus).toHaveAttribute("data-relinked-asset-id", "visual-opening");
+  await expect(projectStatus).toContainText("Relinked Opening shot");
+  await expect(previewStatus).toHaveAttribute("data-preview-phase", "READY", { timeout: 15_000 });
 
   const projectDownloadPromise = page.waitForEvent("download");
   await saveButton.click();
   const projectDownload = await projectDownloadPromise;
   expect(projectDownload.suggestedFilename()).toBe("local-demo-movie.aistudio");
+  const projectPath = await projectDownload.path();
+  if (projectPath === null) throw new Error(".aistudio download path was unavailable.");
   const projectStream = await projectDownload.createReadStream();
   if (projectStream === null) throw new Error(".aistudio download stream was unavailable.");
   const projectChunks: Buffer[] = [];
@@ -68,4 +77,35 @@ test("Studio decodes image, video and audio media, exports MP4, and saves editab
   expect(projectBytes.byteLength).toBeGreaterThan(1_000);
   expect(projectBytes.subarray(0, 4).toString("hex")).toBe("504b0304");
   await expect(exportStatus).toContainText("Editable .aistudio saved");
+
+  await page.locator("[data-open-aistudio-input]").setInputFiles(projectPath);
+  await expect(projectStatus).toContainText("Reopened", { timeout: 15_000 });
+  await expect(previewStatus).toHaveAttribute("data-preview-phase", "READY", { timeout: 15_000 });
+
+  await page.locator("[data-timeline-clip-id='action-shot']").click();
+  await expect(page.locator("[data-timeline-selection]")).toContainText("source 0.58s");
+
+  const mp4DownloadPromise = page.waitForEvent("download");
+  await exportButton.click();
+  const mp4Download = await mp4DownloadPromise;
+
+  expect(mediaRequests).toContain("/demo-media/action-shot.webm.b64");
+  expect(mediaRequests).toContain("/demo-media/opening-tone.ogg.b64");
+  expect(mediaRequests).toContain("/demo-media/action-tone.ogg.b64");
+  expect(mp4Download.suggestedFilename()).toBe("local-demo-project-timeline.mp4");
+  const mp4Stream = await mp4Download.createReadStream();
+  if (mp4Stream === null) throw new Error("MP4 download stream was unavailable.");
+  const mp4Chunks: Buffer[] = [];
+  for await (const chunk of mp4Stream) mp4Chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  const mp4Bytes = Buffer.concat(mp4Chunks);
+  expect(mp4Bytes.byteLength).toBeGreaterThan(1_000);
+  expect(mp4Bytes.subarray(4, 8).toString("ascii")).toBe("ftyp");
+
+  await expect(exportStatus).toHaveAttribute("data-export-phase", "SUCCESS");
+  await expect(exportStatus).toContainText("MP4 ready");
+  await expect(exportStatus).toContainText("shared Preview/Export renderer");
+  await expect(exportStatus).toContainText("1 decoded image");
+  await expect(exportStatus).toContainText("1 decoded video");
+  await expect(exportStatus).toContainText("2 decoded audio");
+  await expect(page.locator("[data-export-mp4-progress]")).toHaveJSProperty("value", 100);
 });
