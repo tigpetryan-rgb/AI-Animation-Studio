@@ -2,7 +2,7 @@ name: Foundation CI
 
 on:
   push:
-    branches: [main, "foundation/**"]
+    branches: [main, "foundation/**", "m54/physical-device-export-evidence"]
   pull_request:
     branches: [main, "m51-53/production-validation"]
 
