@@ -1,34 +1,51 @@
 import { rationalTime } from "@aistudio/core-time";
 import { exportAvcOpusMp4 } from "@aistudio/media-export/mp4";
+import { drawMovieTimelineFrame } from "./studio-frame-renderer";
 import {
   prepareMovieMedia,
   samplePreparedAudio,
-  seekPreparedVideo,
   type PreparedMovieMedia,
 } from "./studio-media-assets";
+import {
+  DEFAULT_STUDIO_EXPORT_SETTINGS,
+  exportPlanSummary,
+  planStudioExport,
+  type ExportAudioBitratePreset,
+  type ExportFrameRatePreset,
+  type ExportQualityPreset,
+  type ExportResolutionPreset,
+  type StudioExportPlan,
+  type StudioExportSettings,
+} from "./studio-export-plan";
 import { exportMovieSessionPackage } from "./studio-session-package";
 import {
   movieDurationSeconds,
   movieSessionForProjectId,
   rationalSeconds,
   sampleMovieTimeline,
-  type MovieTimelineSample,
   type StudioMovieSession,
 } from "./studio-movie-session";
 
 const EXPORT_AUDIO_CHUNK_FRAMES = 960;
 
+type ExportPanelPhase = "IDLE" | "RUNNING" | "SUCCESS" | "ERROR" | "CANCELLED";
+type ExportPanelOperation = "NONE" | "EXPORT" | "SAVE";
+
 interface ExportPanelState {
-  phase: "IDLE" | "RUNNING" | "SUCCESS" | "ERROR";
-  progress: number;
-  message: string;
+  readonly phase: ExportPanelPhase;
+  readonly operation: ExportPanelOperation;
+  readonly progress: number;
+  readonly message: string;
 }
 
 let state: ExportPanelState = {
   phase: "IDLE",
+  operation: "NONE",
   progress: 0,
   message: "Open the local demo project to export or save its timeline media.",
 };
+let settings: StudioExportSettings = { ...DEFAULT_STUDIO_EXPORT_SETTINGS };
+let activeExportController: AbortController | null = null;
 let syncQueued = false;
 
 function currentProjectId(): string | null {
@@ -76,94 +93,6 @@ function updateState(next: Partial<ExportPanelState>): void {
   syncExportPanel();
 }
 
-function normalizedLoop(seconds: number, periodSeconds: number): number {
-  if (periodSeconds <= 0) return 0;
-  const remainder = seconds % periodSeconds;
-  return (remainder < 0 ? remainder + periodSeconds : remainder) / periodSeconds;
-}
-
-function drawDecodedImage(
-  context: OffscreenCanvasRenderingContext2D,
-  image: ImageBitmap,
-  width: number,
-  height: number,
-  sourceSeconds: number,
-  pan: "left-to-right" | "right-to-left",
-): void {
-  const targetAspect = width / height;
-  const sourceAspect = image.width / image.height;
-  let baseCropWidth: number;
-  let baseCropHeight: number;
-
-  if (sourceAspect >= targetAspect) {
-    baseCropHeight = image.height;
-    baseCropWidth = baseCropHeight * targetAspect;
-  } else {
-    baseCropWidth = image.width;
-    baseCropHeight = baseCropWidth / targetAspect;
-  }
-
-  const zoom = 1.08;
-  const cropWidth = baseCropWidth / zoom;
-  const cropHeight = baseCropHeight / zoom;
-  const maxX = Math.max(0, image.width - cropWidth);
-  const maxY = Math.max(0, image.height - cropHeight);
-  const phase = normalizedLoop(sourceSeconds, 2);
-  const sx = pan === "left-to-right" ? maxX * phase : maxX * (1 - phase);
-  const sy = maxY / 2;
-
-  context.drawImage(image, sx, sy, cropWidth, cropHeight, 0, 0, width, height);
-}
-
-async function drawTimelineFrame(
-  context: OffscreenCanvasRenderingContext2D,
-  session: StudioMovieSession,
-  media: PreparedMovieMedia,
-  sample: MovieTimelineSample,
-  timelineSeconds: number,
-  durationSeconds: number,
-): Promise<void> {
-  const { width, height } = session.exportProfile;
-  const video = sample.video;
-  if (video === undefined) {
-    context.fillStyle = "rgb(8, 10, 14)";
-    context.fillRect(0, 0, width, height);
-    return;
-  }
-
-  const sourceSeconds = rationalSeconds(video.sourceTime);
-  let mediaLabel: string;
-  if (video.asset.mediaType === "image") {
-    const image = media.images.get(video.asset.id);
-    if (image === undefined) throw new Error(`Decoded image asset ${video.asset.id} is unavailable.`);
-    drawDecodedImage(context, image, width, height, sourceSeconds, video.asset.pan);
-    mediaLabel = "decoded image";
-  } else {
-    const decoded = media.videos.get(video.asset.id);
-    if (decoded === undefined) throw new Error(`Decoded video asset ${video.asset.id} is unavailable.`);
-    await seekPreparedVideo(decoded, sourceSeconds);
-    context.drawImage(decoded.element, 0, 0, width, height);
-    mediaLabel = "decoded video";
-  }
-
-  context.fillStyle = "rgba(5, 8, 14, 0.68)";
-  context.fillRect(12, 12, 184, 60);
-  context.fillStyle = "rgb(248, 250, 252)";
-  context.font = "bold 14px sans-serif";
-  context.fillText(video.asset.label, 20, 32);
-  context.font = "11px sans-serif";
-  context.fillText(`clip ${video.clip.id}`, 20, 49);
-  context.fillText(`${mediaLabel} · source ${sourceSeconds.toFixed(2)}s`, 20, 64);
-
-  const progress = durationSeconds <= 0 ? 0 : Math.min(1, timelineSeconds / durationSeconds);
-  context.fillStyle = "rgba(255,255,255,0.24)";
-  context.fillRect(20, height - 22, width - 40, 5);
-  context.fillStyle = "rgba(255,255,255,0.92)";
-  context.fillRect(20, height - 22, Math.round((width - 40) * progress), 5);
-  context.font = "11px monospace";
-  context.fillText(`${timelineSeconds.toFixed(2)} / ${durationSeconds.toFixed(2)}s`, 20, height - 32);
-}
-
 function mediaAssetCounts(session: StudioMovieSession): { images: number; videos: number; audio: number } {
   let images = 0;
   let videos = 0;
@@ -187,28 +116,85 @@ function timelineSummary(session: StudioMovieSession): string {
   return `Timeline ${session.timeline.id} · ${movieDurationSeconds(session).toFixed(1)}s · ${videoClips} video clips · ${audioClips} audio clips · ${counts.images} image · ${counts.videos} video file · ${counts.audio} audio files`;
 }
 
+function currentPlan(session: StudioMovieSession): StudioExportPlan {
+  return planStudioExport(session.exportProfile, movieDurationSeconds(session), settings);
+}
+
+function exportSessionForPlan(session: StudioMovieSession, plan: StudioExportPlan): StudioMovieSession {
+  return Object.freeze({
+    ...session,
+    exportProfile: Object.freeze({
+      ...session.exportProfile,
+      width: plan.width,
+      height: plan.height,
+      frameRate: plan.frameRate,
+    }),
+  });
+}
+
+function throwIfCancelled(signal: AbortSignal): void {
+  if (signal.aborted) throw new Error("Export cancelled by user.");
+}
+
+async function yieldToBrowser(signal: AbortSignal): Promise<void> {
+  throwIfCancelled(signal);
+  await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+  throwIfCancelled(signal);
+}
+
+function requestCancel(): void {
+  const controller = activeExportController;
+  if (controller === null || controller.signal.aborted) return;
+  controller.abort();
+  updateState({ message: "Cancelling export…" });
+}
+
 async function exportMovieTimeline(session: StudioMovieSession): Promise<void> {
+  const plan = currentPlan(session);
+  if (plan.blockedReason !== null) {
+    updateState({ phase: "ERROR", operation: "NONE", progress: 0, message: plan.blockedReason });
+    return;
+  }
+  if (session.exportProfile.sampleRate !== 48_000) {
+    updateState({
+      phase: "ERROR",
+      operation: "NONE",
+      progress: 0,
+      message: "Current native MP4 audio path requires a 48 kHz project sample rate.",
+    });
+    return;
+  }
+
   const projectId = session.project.projectId;
-  const { width, height, frameRate, sampleRate, numberOfChannels } = session.exportProfile;
-  const durationSeconds = movieDurationSeconds(session);
-  const frameCount = Math.ceil(durationSeconds * frameRate);
-  const totalAudioFrames = Math.ceil(durationSeconds * sampleRate);
-  const counts = mediaAssetCounts(session);
+  const exportSession = exportSessionForPlan(session, plan);
+  const { width, height, frameRate, sampleRate, numberOfChannels } = exportSession.exportProfile;
+  const durationSeconds = movieDurationSeconds(exportSession);
+  const counts = mediaAssetCounts(exportSession);
+  const controller = new AbortController();
+  const signal = controller.signal;
+  activeExportController = controller;
   let preparedMedia: PreparedMovieMedia | undefined;
 
-  updateState({ phase: "RUNNING", progress: 1, message: `Reading ${session.timeline.id}…` });
+  updateState({
+    phase: "RUNNING",
+    operation: "EXPORT",
+    progress: 1,
+    message: `Preflight passed · ${exportPlanSummary(plan)}`,
+  });
 
   try {
     if (typeof OffscreenCanvas === "undefined") throw new Error("OffscreenCanvas is unavailable in this browser.");
+    throwIfCancelled(signal);
 
     updateState({
       progress: 3,
       message: `Decoding ${counts.images} image, ${counts.videos} video and ${counts.audio} audio assets…`,
     });
-    preparedMedia = await prepareMovieMedia(session);
+    preparedMedia = await prepareMovieMedia(exportSession);
+    throwIfCancelled(signal);
     updateState({
       progress: 8,
-      message: `Decoded ${preparedMedia.images.size} image, ${preparedMedia.videos.size} video and ${preparedMedia.audio.size} audio assets.`,
+      message: `Decoded media · starting ${width}×${height} @ ${frameRate} fps encode…`,
     });
 
     const canvas = new OffscreenCanvas(width, height);
@@ -216,37 +202,47 @@ async function exportMovieTimeline(session: StudioMovieSession): Promise<void> {
     if (context === null) throw new Error("2D canvas context is unavailable.");
 
     const media = preparedMedia;
+    const yieldEveryVideoFrames = Math.max(1, Math.round(frameRate / 4));
+    const yieldEveryAudioChunks = 10;
     const exported = await exportAvcOpusMp4({
       width,
       height,
       frameRate,
-      frameCount,
-      videoBitrate: 500_000,
+      frameCount: plan.frameCount,
+      videoBitrate: plan.videoBitrate,
       numberOfChannels,
-      totalAudioFrames,
+      totalAudioFrames: plan.totalAudioFrames,
       audioChunkFrames: EXPORT_AUDIO_CHUNK_FRAMES,
-      audioBitrate: 64_000,
+      audioBitrate: plan.audioBitrate,
       createFrame: async (index, timestampUs, durationUs) => {
-        const timelineTime = rationalTime(BigInt(index), BigInt(frameRate));
-        const sample = sampleMovieTimeline(session, timelineTime);
-        const timelineSeconds = rationalSeconds(timelineTime);
-        await drawTimelineFrame(context, session, media, sample, timelineSeconds, durationSeconds);
+        if (index % yieldEveryVideoFrames === 0) await yieldToBrowser(signal);
+        else throwIfCancelled(signal);
 
-        const videoProgress = (index + 1) / frameCount;
+        const timelineTime = rationalTime(BigInt(index), BigInt(frameRate));
+        const sample = sampleMovieTimeline(exportSession, timelineTime);
+        const timelineSeconds = rationalSeconds(timelineTime);
+        await drawMovieTimelineFrame(context, exportSession, media, sample, timelineSeconds, durationSeconds);
+        throwIfCancelled(signal);
+
+        const videoProgress = (index + 1) / plan.frameCount;
         updateState({
           progress: Math.max(state.progress, 8 + Math.round(videoProgress * 62)),
           message: sample.video === undefined
-            ? `Encoding timeline gap… ${index + 1}/${frameCount}`
-            : `Compositing ${sample.video.asset.label}… ${index + 1}/${frameCount}`,
+            ? `Encoding timeline gap… ${index + 1}/${plan.frameCount}`
+            : `Compositing ${sample.video.asset.label}… ${index + 1}/${plan.frameCount}`,
         });
         return new VideoFrame(canvas, { timestamp: timestampUs, duration: durationUs });
       },
-      createAudioData: (startFrame, frameCountForChunk, timestampUs) => {
+      createAudioData: async (startFrame, frameCountForChunk, timestampUs) => {
+        const chunkIndex = Math.floor(startFrame / EXPORT_AUDIO_CHUNK_FRAMES);
+        if (chunkIndex % yieldEveryAudioChunks === 0) await yieldToBrowser(signal);
+        else throwIfCancelled(signal);
+
         const samples = new Float32Array(frameCountForChunk * numberOfChannels);
         for (let frame = 0; frame < frameCountForChunk; frame += 1) {
           const absoluteFrame = startFrame + frame;
           const timelineTime = rationalTime(BigInt(absoluteFrame), BigInt(sampleRate));
-          const timelineSample = sampleMovieTimeline(session, timelineTime);
+          const timelineSample = sampleMovieTimeline(exportSession, timelineTime);
           const audioSample = timelineSample.audio;
           if (audioSample !== undefined) {
             const decoded = media.audio.get(audioSample.asset.id);
@@ -254,8 +250,9 @@ async function exportMovieTimeline(session: StudioMovieSession): Promise<void> {
             samples[frame] = samplePreparedAudio(decoded, rationalSeconds(audioSample.sourceTime));
           }
         }
+        throwIfCancelled(signal);
 
-        const audioProgress = (startFrame + frameCountForChunk) / totalAudioFrames;
+        const audioProgress = (startFrame + frameCountForChunk) / plan.totalAudioFrames;
         updateState({
           progress: Math.max(state.progress, 70 + Math.round(audioProgress * 25)),
           message: "Mixing decoded timeline audio…",
@@ -271,42 +268,81 @@ async function exportMovieTimeline(session: StudioMovieSession): Promise<void> {
       },
     });
 
+    throwIfCancelled(signal);
     updateState({ progress: 98, message: "Preparing MP4 download…" });
     downloadBytes(exported.bytes, exported.mimeType, `${safeFileStem(projectId)}-timeline.mp4`);
     updateState({
       phase: "SUCCESS",
+      operation: "NONE",
       progress: 100,
-      message: `MP4 ready · ${durationSeconds.toFixed(1)}s · ${media.images.size} decoded image · ${media.videos.size} decoded video · ${media.audio.size} decoded audio · ${exported.encodedVideoChunks} video chunks · ${exported.encodedAudioChunks} audio chunks`,
+      message: `MP4 ready · ${width}×${height} @ ${frameRate} fps · shared Preview/Export renderer · ${media.images.size} decoded image · ${media.videos.size} decoded video · ${media.audio.size} decoded audio · ${exported.encodedVideoChunks} video chunks · ${exported.encodedAudioChunks} audio chunks`,
     });
   } catch (error) {
-    updateState({
-      phase: "ERROR",
-      progress: 0,
-      message: error instanceof Error ? error.message : "MP4 timeline export failed.",
-    });
+    if (signal.aborted) {
+      updateState({
+        phase: "CANCELLED",
+        operation: "NONE",
+        progress: 0,
+        message: "Export cancelled. No MP4 was downloaded.",
+      });
+    } else {
+      updateState({
+        phase: "ERROR",
+        operation: "NONE",
+        progress: 0,
+        message: error instanceof Error ? error.message : "MP4 timeline export failed.",
+      });
+    }
   } finally {
     preparedMedia?.close();
+    if (activeExportController === controller) activeExportController = null;
+    syncExportPanel();
   }
 }
 
 async function saveEditableProject(session: StudioMovieSession): Promise<void> {
   if (state.phase === "RUNNING") return;
-  updateState({ phase: "RUNNING", progress: 10, message: "Packing Timeline and media manifest into .aistudio…" });
+  updateState({
+    phase: "RUNNING",
+    operation: "SAVE",
+    progress: 10,
+    message: "Packing Timeline and media manifest into .aistudio…",
+  });
   try {
     const bytes = await exportMovieSessionPackage(session);
     downloadBytes(bytes, "application/zip", `${safeFileStem(session.project.name)}.aistudio`);
     updateState({
       phase: "SUCCESS",
+      operation: "NONE",
       progress: 100,
       message: `Editable .aistudio saved · ${session.timeline.tracks.length} tracks · ${Object.keys(session.assets).length} media assets`,
     });
   } catch (error) {
     updateState({
       phase: "ERROR",
+      operation: "NONE",
       progress: 0,
       message: error instanceof Error ? error.message : ".aistudio save failed.",
     });
   }
+}
+
+function appendOption(select: HTMLSelectElement, value: string, label: string): void {
+  const option = document.createElement("option");
+  option.value = value;
+  option.textContent = label;
+  select.append(option);
+}
+
+function createSettingSelect(labelText: string, datasetKey: string): { wrapper: HTMLLabelElement; select: HTMLSelectElement } {
+  const wrapper = document.createElement("label");
+  wrapper.className = "export-setting";
+  const label = document.createElement("span");
+  label.textContent = labelText;
+  const select = document.createElement("select");
+  select.dataset[datasetKey] = "true";
+  wrapper.append(label, select);
+  return { wrapper, select };
 }
 
 function ensurePanel(assets: HTMLElement): HTMLElement {
@@ -323,7 +359,50 @@ function ensurePanel(assets: HTMLElement): HTMLElement {
   const note = document.createElement("p");
   note.className = "muted";
   note.dataset.exportTimelineSummary = "true";
-  note.textContent = "Timeline media can be rendered to MP4 or saved as an editable .aistudio package.";
+
+  const settingsGrid = document.createElement("div");
+  settingsGrid.className = "export-settings-grid";
+
+  const resolution = createSettingSelect("Resolution", "exportResolutionSelect");
+  appendOption(resolution.select, "source", "Source");
+  appendOption(resolution.select, "720p", "HD 720p");
+  appendOption(resolution.select, "1080p", "Full HD 1080p");
+  resolution.select.addEventListener("change", () => {
+    settings = { ...settings, resolution: resolution.select.value as ExportResolutionPreset };
+    syncExportPanel();
+  });
+
+  const frameRate = createSettingSelect("Frame rate", "exportFrameRateSelect");
+  appendOption(frameRate.select, "source", "Source");
+  appendOption(frameRate.select, "24", "24 fps");
+  appendOption(frameRate.select, "30", "30 fps");
+  frameRate.select.addEventListener("change", () => {
+    settings = { ...settings, frameRate: frameRate.select.value as ExportFrameRatePreset };
+    syncExportPanel();
+  });
+
+  const quality = createSettingSelect("Video quality", "exportQualitySelect");
+  appendOption(quality.select, "draft", "Draft");
+  appendOption(quality.select, "balanced", "Balanced");
+  appendOption(quality.select, "high", "High");
+  quality.select.addEventListener("change", () => {
+    settings = { ...settings, quality: quality.select.value as ExportQualityPreset };
+    syncExportPanel();
+  });
+
+  const audio = createSettingSelect("Audio bitrate", "exportAudioBitrateSelect");
+  appendOption(audio.select, "64", "64 kbps");
+  appendOption(audio.select, "96", "96 kbps");
+  appendOption(audio.select, "128", "128 kbps");
+  audio.select.addEventListener("change", () => {
+    settings = { ...settings, audioBitrate: audio.select.value as ExportAudioBitratePreset };
+    syncExportPanel();
+  });
+  settingsGrid.append(resolution.wrapper, frameRate.wrapper, quality.wrapper, audio.wrapper);
+
+  const planSummary = document.createElement("p");
+  planSummary.className = "export-plan-summary muted";
+  planSummary.dataset.exportPlanSummary = "true";
 
   const exportButton = document.createElement("button");
   exportButton.type = "button";
@@ -333,6 +412,12 @@ function ensurePanel(assets: HTMLElement): HTMLElement {
     const session = currentMovieSession();
     if (session !== null && state.phase !== "RUNNING") void exportMovieTimeline(session);
   });
+
+  const cancelButton = document.createElement("button");
+  cancelButton.type = "button";
+  cancelButton.dataset.cancelExportButton = "true";
+  cancelButton.textContent = "Cancel export";
+  cancelButton.addEventListener("click", requestCancel);
 
   const saveButton = document.createElement("button");
   saveButton.type = "button";
@@ -352,7 +437,7 @@ function ensurePanel(assets: HTMLElement): HTMLElement {
   status.dataset.exportMp4Status = "true";
   status.setAttribute("role", "status");
 
-  panel.append(heading, note, exportButton, saveButton, progress, status);
+  panel.append(heading, note, settingsGrid, planSummary, exportButton, cancelButton, saveButton, progress, status);
   assets.append(panel);
   return panel;
 }
@@ -364,38 +449,75 @@ function syncExportPanel(): void {
 
   const panel = ensurePanel(assets);
   const exportButton = panel.querySelector<HTMLButtonElement>("[data-export-mp4-button]");
+  const cancelButton = panel.querySelector<HTMLButtonElement>("[data-cancel-export-button]");
   const saveButton = panel.querySelector<HTMLButtonElement>("[data-save-aistudio-button]");
   const progress = panel.querySelector<HTMLProgressElement>("[data-export-mp4-progress]");
   const status = panel.querySelector<HTMLElement>("[data-export-mp4-status]");
   const summary = panel.querySelector<HTMLElement>("[data-export-timeline-summary]");
-  if (exportButton === null || saveButton === null || progress === null || status === null || summary === null) return;
+  const planSummary = panel.querySelector<HTMLElement>("[data-export-plan-summary]");
+  const resolution = panel.querySelector<HTMLSelectElement>("[data-export-resolution-select]");
+  const frameRate = panel.querySelector<HTMLSelectElement>("[data-export-frame-rate-select]");
+  const quality = panel.querySelector<HTMLSelectElement>("[data-export-quality-select]");
+  const audio = panel.querySelector<HTMLSelectElement>("[data-export-audio-bitrate-select]");
+  if (
+    exportButton === null || cancelButton === null || saveButton === null || progress === null
+    || status === null || summary === null || planSummary === null || resolution === null
+    || frameRate === null || quality === null || audio === null
+  ) return;
 
   const session = currentMovieSession();
   const running = state.phase === "RUNNING";
-  exportButton.disabled = session === null || running;
+  const exporting = running && state.operation === "EXPORT";
+  let plan: StudioExportPlan | null = null;
+  if (session !== null) plan = currentPlan(session);
+
+  resolution.value = settings.resolution;
+  frameRate.value = settings.frameRate;
+  quality.value = settings.quality;
+  audio.value = settings.audioBitrate;
+  for (const control of [resolution, frameRate, quality, audio]) control.disabled = running || session === null;
+
+  exportButton.disabled = session === null || running || plan?.blockedReason !== null;
   saveButton.disabled = session === null || running;
-  setText(exportButton, running ? `Working… ${state.progress}%` : "Export media MP4");
-  setText(saveButton, "Save editable .aistudio");
+  cancelButton.hidden = !exporting;
+  cancelButton.disabled = !exporting || activeExportController?.signal.aborted === true;
+  setText(exportButton, exporting ? `Exporting… ${state.progress}%` : "Export MP4");
+  setText(saveButton, state.operation === "SAVE" ? "Saving…" : "Save editable .aistudio");
   progress.value = state.progress;
   progress.hidden = state.phase === "IDLE" && session === null;
   status.dataset.exportPhase = state.phase;
+  status.dataset.exportOperation = state.operation;
 
   if (session === null) {
     setText(summary, "Open the local demo project to attach its persisted Timeline media session.");
+    setText(planSummary, "Export settings become available when a project is open.");
     if (!running) setText(status, "Open the local demo project to export or save its timeline media.");
+    return;
+  }
+
+  const counts = mediaAssetCounts(session);
+  setText(summary, timelineSummary(session));
+  summary.dataset.timelineId = session.timeline.id;
+  summary.dataset.timelineDurationSeconds = String(movieDurationSeconds(session));
+  summary.dataset.imageAssetCount = String(counts.images);
+  summary.dataset.videoAssetCount = String(counts.videos);
+  summary.dataset.audioAssetCount = String(counts.audio);
+
+  if (plan !== null) {
+    setText(planSummary, plan.blockedReason ?? plan.warning ?? exportPlanSummary(plan));
+    planSummary.dataset.exportWidth = String(plan.width);
+    planSummary.dataset.exportHeight = String(plan.height);
+    planSummary.dataset.exportFrameRate = String(plan.frameRate);
+    planSummary.dataset.exportVideoBitrate = String(plan.videoBitrate);
+    planSummary.dataset.exportAudioBitrate = String(plan.audioBitrate);
+    planSummary.dataset.exportEstimatedBytes = String(plan.estimatedOutputBytes);
+    planSummary.dataset.exportBlocked = String(plan.blockedReason !== null);
+  }
+
+  if (running || state.phase !== "IDLE") {
+    setText(status, state.message);
   } else {
-    const counts = mediaAssetCounts(session);
-    setText(summary, timelineSummary(session));
-    summary.dataset.timelineId = session.timeline.id;
-    summary.dataset.timelineDurationSeconds = String(movieDurationSeconds(session));
-    summary.dataset.imageAssetCount = String(counts.images);
-    summary.dataset.videoAssetCount = String(counts.videos);
-    summary.dataset.audioAssetCount = String(counts.audio);
-    if (!running && state.phase === "IDLE") {
-      setText(status, "Timeline ready: image/video/audio decode, MP4 export, and editable .aistudio save.");
-    } else {
-      setText(status, state.message);
-    }
+    setText(status, "Timeline ready: configure export, render MP4, or save editable .aistudio.");
   }
 }
 
@@ -408,6 +530,7 @@ function scheduleSync(): void {
 export function installStudioExportPanel(): void {
   const observer = new MutationObserver(scheduleSync);
   observer.observe(document.documentElement, { childList: true, subtree: true });
+  window.addEventListener("aistudio:movie-session-change", scheduleSync);
   scheduleSync();
 }
 

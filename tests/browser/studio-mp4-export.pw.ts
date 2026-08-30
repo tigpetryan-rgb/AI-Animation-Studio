@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-test("Studio edits Timeline, previews shared media, relinks, reopens, and exports MP4", async ({ page }) => {
+test("Studio edits, reopens, configures, cancels, and exports guarded MP4", async ({ page }) => {
+  test.setTimeout(90_000);
+
   const mediaRequests: string[] = [];
   page.on("request", (request) => {
     const url = new URL(request.url());
@@ -10,9 +12,15 @@ test("Studio edits Timeline, previews shared media, relinks, reopens, and export
   await page.goto("/");
 
   const exportButton = page.locator("[data-export-mp4-button]");
+  const cancelButton = page.locator("[data-cancel-export-button]");
   const saveButton = page.locator("[data-save-aistudio-button]");
   const exportStatus = page.locator("[data-export-mp4-status]");
   const timelineSummary = page.locator("[data-export-timeline-summary]");
+  const planSummary = page.locator("[data-export-plan-summary]");
+  const resolution = page.locator("[data-export-resolution-select]");
+  const frameRate = page.locator("[data-export-frame-rate-select]");
+  const quality = page.locator("[data-export-quality-select]");
+  const audioBitrate = page.locator("[data-export-audio-bitrate-select]");
   const projectStatus = page.locator("[data-project-file-status]");
 
   await expect(exportButton).toBeVisible();
@@ -24,6 +32,14 @@ test("Studio edits Timeline, previews shared media, relinks, reopens, and export
 
   await expect(exportButton).toBeEnabled();
   await expect(saveButton).toBeEnabled();
+  await expect(resolution).toHaveValue("source");
+  await expect(frameRate).toHaveValue("source");
+  await expect(quality).toHaveValue("balanced");
+  await expect(audioBitrate).toHaveValue("96");
+  await expect(planSummary).toHaveAttribute("data-export-width", "320");
+  await expect(planSummary).toHaveAttribute("data-export-height", "180");
+  await expect(planSummary).toHaveAttribute("data-export-frame-rate", "12");
+  await expect(planSummary).toHaveAttribute("data-export-blocked", "false");
   await expect(timelineSummary).toHaveAttribute("data-timeline-id", "local-demo-timeline");
   await expect(timelineSummary).toHaveAttribute("data-timeline-duration-seconds", "4");
   await expect(timelineSummary).toHaveAttribute("data-image-asset-count", "1");
@@ -85,7 +101,41 @@ test("Studio edits Timeline, previews shared media, relinks, reopens, and export
   await page.locator("[data-timeline-clip-id='action-shot']").click();
   await expect(page.locator("[data-timeline-selection]")).toContainText("source 0.58s");
 
-  const mp4DownloadPromise = page.waitForEvent("download");
+  // Verify HD/FPS settings resolve into a concrete plan even when this CI Chromium cannot encode that profile.
+  await resolution.selectOption("720p");
+  await frameRate.selectOption("24");
+  await quality.selectOption("high");
+  await audioBitrate.selectOption("128");
+  await expect(planSummary).toHaveAttribute("data-export-width", "1280");
+  await expect(planSummary).toHaveAttribute("data-export-height", "720");
+  await expect(planSummary).toHaveAttribute("data-export-frame-rate", "24");
+  await expect(planSummary).toHaveAttribute("data-export-blocked", "false");
+
+  // The actual CI encode gate uses the browser-supported source profile. Cancel it immediately while media preparation is active.
+  await resolution.selectOption("source");
+  await frameRate.selectOption("source");
+  await expect(planSummary).toHaveAttribute("data-export-width", "320");
+  await expect(planSummary).toHaveAttribute("data-export-frame-rate", "12");
+
+  await exportButton.click();
+  await page.evaluate(() => {
+    const button = document.querySelector<HTMLButtonElement>("[data-cancel-export-button]");
+    if (button === null || button.hidden || button.disabled) throw new Error("Cancel export button is not actionable.");
+    button.click();
+  });
+  await expect(exportStatus).toHaveAttribute("data-export-phase", "CANCELLED", { timeout: 15_000 });
+  await expect(exportStatus).toContainText("No MP4 was downloaded");
+  await expect(cancelButton).toBeHidden();
+  await expect(exportButton).toBeEnabled();
+
+  // A cancelled job must not poison the next export.
+  await quality.selectOption("balanced");
+  await audioBitrate.selectOption("96");
+  await expect(planSummary).toHaveAttribute("data-export-width", "320");
+  await expect(planSummary).toHaveAttribute("data-export-height", "180");
+  await expect(planSummary).toHaveAttribute("data-export-frame-rate", "12");
+
+  const mp4DownloadPromise = page.waitForEvent("download", { timeout: 30_000 });
   await exportButton.click();
   const mp4Download = await mp4DownloadPromise;
 
@@ -103,6 +153,7 @@ test("Studio edits Timeline, previews shared media, relinks, reopens, and export
 
   await expect(exportStatus).toHaveAttribute("data-export-phase", "SUCCESS");
   await expect(exportStatus).toContainText("MP4 ready");
+  await expect(exportStatus).toContainText("320×180 @ 12 fps");
   await expect(exportStatus).toContainText("shared Preview/Export renderer");
   await expect(exportStatus).toContainText("1 decoded image");
   await expect(exportStatus).toContainText("1 decoded video");
