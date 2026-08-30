@@ -66,9 +66,12 @@ test("Studio opens projects and gates export safely on this browser profile", as
 
   await page.getByRole("button", { name: "Open local demo" }).click();
 
-  const projectLabel = page.locator(".assets-panel > h2 + p.muted");
   try {
-    await expect(projectLabel).toHaveText("local-demo-project", { timeout: 5_000 });
+    await page.waitForFunction(
+      () => document.querySelector(".assets-panel > h2 + p.muted")?.textContent === "local-demo-project",
+      undefined,
+      { timeout: 5_000 },
+    );
   } catch (error) {
     throw new Error(`Project shell did not settle after pointer activation. pageErrors=${JSON.stringify(pageErrors)} diagnostics=${JSON.stringify(diagnostics)}`, { cause: error });
   }
@@ -96,9 +99,17 @@ test("Studio opens projects and gates export safely on this browser profile", as
     await expect(exportButton).toBeEnabled();
   } else {
     await expect(exportButton).toBeDisabled();
-    await expect(page.locator("[data-export-mp4-status]")).toContainText("unavailable");
+    await page.waitForFunction(
+      () => document.querySelector("[data-export-mp4-status]")?.textContent?.includes("unavailable") === true,
+      undefined,
+      { timeout: 5_000 },
+    );
   }
 
   await page.locator("[data-timeline-clip-id='action-shot']").click();
-  await expect(page.locator("[data-timeline-selection]")).toContainText("action-shot");
+  await page.waitForFunction(
+    () => document.querySelector("[data-timeline-selection]")?.textContent?.includes("action-shot") === true,
+    undefined,
+    { timeout: 5_000 },
+  );
 });
