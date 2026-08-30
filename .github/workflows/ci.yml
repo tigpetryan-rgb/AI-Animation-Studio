@@ -42,11 +42,14 @@ jobs:
       - name: Build Studio Web
         run: npm run build:web
 
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox webkit
 
-      - name: Browser smoke
+      - name: Chromium browser smoke and export stress
         run: npm run test:browser
+
+      - name: Browser compatibility matrix
+        run: npm run test:browser:compat
 
       - name: Build release candidate package
         run: |
