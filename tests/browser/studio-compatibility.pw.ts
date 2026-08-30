@@ -28,7 +28,27 @@ test("Studio opens projects and gates export safely on this browser profile", as
   // after the target node has been removed.
   await activateSelfReplacingControl(page.getByRole("button", { name: "Open local demo" }));
 
-  await expect(page.locator(".assets-panel > p.muted")).toHaveText("local-demo-project");
+  const projectLabel = page.locator(".assets-panel > p.muted");
+  try {
+    await expect(projectLabel).toHaveText("local-demo-project", { timeout: 5_000 });
+  } catch (error) {
+    const snapshot = await page.evaluate(() => {
+      const assets = document.querySelector<HTMLElement>(".assets-panel");
+      const project = assets?.querySelector<HTMLElement>(":scope > p.muted") ?? null;
+      const projectButton = Array.from(assets?.querySelectorAll<HTMLButtonElement>(":scope > button") ?? [])
+        .find((button) => button.textContent?.includes("Project") || button.textContent?.includes("Open")) ?? null;
+      return {
+        projectText: project?.textContent ?? null,
+        projectOuterHtml: project?.outerHTML ?? null,
+        projectButtonText: projectButton?.textContent ?? null,
+        projectButtonDisabled: projectButton?.disabled ?? null,
+        assetsText: assets?.textContent ?? null,
+        assetsHtml: assets?.innerHTML ?? null,
+        readyState: document.readyState,
+      };
+    });
+    throw new Error(`Project shell did not settle after activation. pageErrors=${JSON.stringify(pageErrors)} snapshot=${JSON.stringify(snapshot)}`, { cause: error });
+  }
 
   const projectControls = page.locator("[data-project-file-controls]");
   try {
