@@ -176,6 +176,11 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
+export function isMp4VideoMimeType(mimeType: string): boolean {
+  const essence = mimeType.split(";", 1)[0]?.trim().toLowerCase();
+  return essence === "video/mp4";
+}
+
 function canUseNativeRuntimeStream(): boolean {
   return window.AIStudioRuntime !== undefined && window.StudioRuntimeAndroid !== undefined;
 }
@@ -218,7 +223,7 @@ async function createNativeRuntimeStreamingExportFile(fileStem: string): Promise
     },
     async finalize(mimeType, downloadName) {
       if (settled) throw new StudioExportStorageError("STORAGE_WRITE_FAILED", "Native streaming export file is already closed.");
-      if (mimeType !== "video/mp4" || downloadName !== expectedDownloadName) {
+      if (!isMp4VideoMimeType(mimeType) || downloadName !== expectedDownloadName) {
         settled = true;
         try {
           parseNativeResponse(bridge.abortFileWrite(sessionId), "abortFileWrite");
