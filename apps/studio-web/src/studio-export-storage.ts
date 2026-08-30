@@ -2,6 +2,7 @@ import type { FragmentedMp4ByteSink } from "@aistudio/media-export/mp4";
 
 export const STUDIO_STREAMING_STORAGE_HEADROOM_BYTES = 64 * 1024 * 1024;
 export const STUDIO_STREAMING_STORAGE_HEADROOM_RATIO = 1.1;
+const FINALIZED_EXPORT_CLEANUP_DELAY_MS = 30_000;
 
 export type StudioExportStorageErrorCode =
   | "STORAGE_UNAVAILABLE"
@@ -98,7 +99,7 @@ function triggerFileDownload(file: File, filename: string): void {
   document.body.append(anchor);
   anchor.click();
   anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  window.setTimeout(() => URL.revokeObjectURL(url), FINALIZED_EXPORT_CLEANUP_DELAY_MS);
 }
 
 function isQuotaError(error: unknown): boolean {
@@ -176,7 +177,7 @@ export async function createStudioStreamingExportFile(
     try {
       await directory.removeEntry(temporaryName);
     } catch {
-      // Best-effort cleanup. The file snapshot used for download remains valid after OPFS removal.
+      // Best-effort cleanup. The browser may already have removed an aborted entry.
     }
   };
 
@@ -201,7 +202,9 @@ export async function createStudioStreamingExportFile(
         const stored = await handle.getFile();
         void mimeType;
         triggerFileDownload(stored, downloadName);
-        await removeTemporaryEntry();
+        // Keep the backing OPFS entry alive long enough for the browser download
+        // to finish opening/reading it. Cancel/failure cleanup remains immediate.
+        window.setTimeout(() => { void removeTemporaryEntry(); }, FINALIZED_EXPORT_CLEANUP_DELAY_MS);
         return stored;
       } catch (error) {
         await removeTemporaryEntry();
