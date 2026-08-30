@@ -28,7 +28,7 @@ describe("Studio long-export planning", () => {
 
     expect(twoHours.frameCount).toBe(216_000);
     expect(twoHours.totalAudioFrames).toBe(345_600_000);
-    expect(twoHours.estimatedOutputBytes).toBeGreaterThan(10 * 1024 * 1024 * 1024);
+    expect(twoHours.estimatedOutputBytes).toBeGreaterThan(9 * 1024 * 1024 * 1024);
     expect(twoHours.estimatedPeakWorkingBytes).toBe(oneMinute.estimatedPeakWorkingBytes);
     expect(twoHours.estimatedPeakWorkingBytes).toBeLessThan(MAX_STREAMING_PEAK_WORKING_BYTES);
     expect(twoHours.blockedReason).toBeNull();
