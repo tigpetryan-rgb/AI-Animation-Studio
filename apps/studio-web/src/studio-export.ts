@@ -837,7 +837,7 @@ function syncExportPanel(): void {
 function scheduleSync(): void {
   if (syncQueued) return;
   syncQueued = true;
-  queueMicrotask(syncExportPanel);
+  window.setTimeout(syncExportPanel, 0);
 }
 
 export function installStudioExportPanel(): void {
