@@ -10,6 +10,9 @@ async function activateSelfReplacingControl(locator: import("@playwright/test").
 }
 
 test("Studio opens projects and gates export safely on this browser profile", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(`${error.name}: ${error.message}`));
+
   await page.goto("/");
 
   const exportButton = page.locator("[data-export-mp4-button]");
@@ -25,7 +28,34 @@ test("Studio opens projects and gates export safely on this browser profile", as
   // after the target node has been removed.
   await activateSelfReplacingControl(page.getByRole("button", { name: "Open local demo" }));
 
-  await expect(page.locator("[data-timeline-editor]")).toBeVisible();
+  await expect(page.locator(".assets-panel > p.muted")).toHaveText("local-demo-project");
+
+  const projectControls = page.locator("[data-project-file-controls]");
+  try {
+    await expect(projectControls).toBeVisible({ timeout: 5_000 });
+  } catch (error) {
+    const snapshot = await page.evaluate(() => ({
+      projectText: document.querySelector(".assets-panel > p.muted")?.textContent ?? null,
+      exportSummary: document.querySelector("[data-export-timeline-summary]")?.textContent ?? null,
+      exportStatus: document.querySelector("[data-export-mp4-status]")?.textContent ?? null,
+      scripts: Array.from(document.scripts).map((script) => script.src || "inline"),
+    }));
+    throw new Error(`Timeline sidecar did not install. pageErrors=${JSON.stringify(pageErrors)} snapshot=${JSON.stringify(snapshot)}`, { cause: error });
+  }
+
+  try {
+    await expect(page.locator("[data-timeline-editor]")).toBeVisible({ timeout: 10_000 });
+  } catch (error) {
+    const snapshot = await page.evaluate(() => ({
+      projectText: document.querySelector(".assets-panel > p.muted")?.textContent ?? null,
+      projectControls: document.querySelector("[data-project-file-controls]") !== null,
+      exportSummary: document.querySelector("[data-export-timeline-summary]")?.textContent ?? null,
+      exportTimelineId: document.querySelector<HTMLElement>("[data-export-timeline-summary]")?.dataset.timelineId ?? null,
+      exportStatus: document.querySelector("[data-export-mp4-status]")?.textContent ?? null,
+    }));
+    throw new Error(`Timeline session did not attach. pageErrors=${JSON.stringify(pageErrors)} snapshot=${JSON.stringify(snapshot)}`, { cause: error });
+  }
+
   await expect(saveButton).toBeEnabled();
   await expect(capabilitySummary).toHaveAttribute("data-export-opus-supported", /^(true|false)$/);
   await expect(capabilitySummary).toHaveAttribute("data-export-aac-supported", /^(true|false)$/);
