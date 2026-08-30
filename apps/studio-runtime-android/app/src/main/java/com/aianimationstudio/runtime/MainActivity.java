@@ -1,0 +1,106 @@
+package com.aianimationstudio.runtime;
+
+import android.app.Activity;
+import android.graphics.Color;
+import android.net.Uri;
+import android.os.Bundle;
+import android.webkit.CookieManager;
+import android.webkit.RenderProcessGoneDetail;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+
+import androidx.annotation.Nullable;
+import androidx.webkit.WebViewAssetLoader;
+
+public final class MainActivity extends Activity {
+    private static final String STUDIO_ORIGIN = "https://appassets.androidplatform.net";
+    private static final String STUDIO_URL = STUDIO_ORIGIN + "/assets/studio/index.html";
+
+    private WebView webView;
+    private WebViewAssetLoader assetLoader;
+
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
+        createWebView();
+    }
+
+    @SuppressWarnings("SetJavaScriptEnabled")
+    private void createWebView() {
+        assetLoader = new WebViewAssetLoader.Builder()
+                .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
+                .build();
+
+        webView = new WebView(this);
+        webView.setBackgroundColor(Color.rgb(17, 19, 24));
+
+        WebSettings settings = webView.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setAllowFileAccess(false);
+        settings.setAllowContentAccess(false);
+        settings.setMediaPlaybackRequiresUserGesture(false);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        settings.setSafeBrowsingEnabled(true);
+
+        CookieManager.getInstance().setAcceptThirdPartyCookies(webView, false);
+        webView.addJavascriptInterface(new StudioRuntimeBridge(this), "StudioRuntimeAndroid");
+        webView.setWebViewClient(new RuntimeWebViewClient());
+
+        setContentView(webView);
+        webView.loadUrl(STUDIO_URL);
+    }
+
+    private boolean isControlledStudioUri(Uri uri) {
+        return "https".equals(uri.getScheme()) && "appassets.androidplatform.net".equals(uri.getHost());
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (webView != null && webView.canGoBack()) {
+            webView.goBack();
+            return;
+        }
+        super.onBackPressed();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (webView != null) {
+            webView.removeJavascriptInterface("StudioRuntimeAndroid");
+            webView.destroy();
+            webView = null;
+        }
+        super.onDestroy();
+    }
+
+    private final class RuntimeWebViewClient extends WebViewClient {
+        @Override
+        public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+            return assetLoader.shouldInterceptRequest(request.getUrl());
+        }
+
+        @Override
+        public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+            return !isControlledStudioUri(request.getUrl());
+        }
+
+        @Override
+        @SuppressWarnings("deprecation")
+        public boolean shouldOverrideUrlLoading(WebView view, String url) {
+            return !isControlledStudioUri(Uri.parse(url));
+        }
+
+        @Override
+        public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+            view.removeJavascriptInterface("StudioRuntimeAndroid");
+            view.destroy();
+            createWebView();
+            return true;
+        }
+    }
+}
