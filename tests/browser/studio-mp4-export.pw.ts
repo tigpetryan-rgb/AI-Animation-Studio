@@ -101,13 +101,13 @@ test("Studio edits, reopens, configures, cancels, and exports guarded MP4", asyn
   await page.locator("[data-timeline-clip-id='action-shot']").click();
   await expect(page.locator("[data-timeline-selection]")).toContainText("source 0.58s");
 
-  // Make the first job intentionally heavier so Cancel is exercised while real WebCodecs work is active.
-  await resolution.selectOption("1080p");
-  await frameRate.selectOption("30");
+  // Cancel a real supported HD WebCodecs job, not an intentionally unsupported codec config.
+  await resolution.selectOption("720p");
+  await frameRate.selectOption("24");
   await quality.selectOption("high");
   await audioBitrate.selectOption("128");
-  await expect(planSummary).toHaveAttribute("data-export-width", "1920");
-  await expect(planSummary).toHaveAttribute("data-export-frame-rate", "30");
+  await expect(planSummary).toHaveAttribute("data-export-width", "1280");
+  await expect(planSummary).toHaveAttribute("data-export-frame-rate", "24");
   await expect(planSummary).toHaveAttribute("data-export-blocked", "false");
 
   await exportButton.click();
@@ -118,9 +118,7 @@ test("Studio edits, reopens, configures, cancels, and exports guarded MP4", asyn
   await expect(cancelButton).toBeHidden();
   await expect(exportButton).toBeEnabled();
 
-  // A cancelled job must not poison the next export. Use HD settings for a real successful encode.
-  await resolution.selectOption("720p");
-  await frameRate.selectOption("24");
+  // A cancelled job must not poison the next export. Re-run the same HD profile at balanced quality.
   await quality.selectOption("balanced");
   await audioBitrate.selectOption("96");
   await expect(planSummary).toHaveAttribute("data-export-width", "1280");
