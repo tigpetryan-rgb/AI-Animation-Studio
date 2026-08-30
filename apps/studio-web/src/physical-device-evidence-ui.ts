@@ -94,6 +94,24 @@ function waitForEvent(target: EventTarget, name: string, timeoutMs: number): Pro
   });
 }
 
+async function waitForPlaybackProgress(
+  video: HTMLVideoElement,
+  initialTime: number,
+  timeoutMs: number,
+): Promise<void> {
+  const deadline = performance.now() + timeoutMs;
+  while (true) {
+    if (video.error !== null) {
+      throw new Error(`Media playback verification failed (code ${video.error.code}).`);
+    }
+    if (video.currentTime > initialTime + 0.01 || (video.ended && video.currentTime > initialTime)) return;
+
+    const remainingMs = deadline - performance.now();
+    if (remainingMs <= 0) throw new Error("Timed out waiting for playback progress.");
+    await new Promise<void>((resolve) => window.setTimeout(resolve, Math.min(50, remainingMs)));
+  }
+}
+
 async function verifyMp4(file: File): Promise<VerifiedMp4> {
   if (file.size <= 0) throw new Error("Selected MP4 is empty.");
   const buffer = await file.arrayBuffer();
@@ -106,7 +124,15 @@ async function verifyMp4(file: File): Promise<VerifiedMp4> {
   video.muted = true;
   video.playsInline = true;
   video.preload = "auto";
-  video.style.display = "none";
+  video.width = 1;
+  video.height = 1;
+  video.setAttribute("aria-hidden", "true");
+  video.style.position = "fixed";
+  video.style.width = "1px";
+  video.style.height = "1px";
+  video.style.left = "0";
+  video.style.bottom = "0";
+  video.style.pointerEvents = "none";
   document.body.append(video);
 
   let metadataLoaded = false;
@@ -120,9 +146,10 @@ async function verifyMp4(file: File): Promise<VerifiedMp4> {
       && video.duration > 0
       && video.videoWidth > 0
       && video.videoHeight > 0;
+    const playbackStart = video.currentTime;
     await video.play();
-    if (video.currentTime <= 0.05) await waitForEvent(video, "timeupdate", 8_000);
-    playbackProgressed = video.currentTime > 0;
+    await waitForPlaybackProgress(video, playbackStart, 8_000);
+    playbackProgressed = video.currentTime > playbackStart;
   } finally {
     video.pause();
     video.removeAttribute("src");
