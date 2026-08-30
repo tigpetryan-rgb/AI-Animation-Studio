@@ -285,7 +285,31 @@ export function createLocalDemoMovieSession(): StudioMovieSession {
 }
 
 const localDemoSession = createLocalDemoMovieSession();
+const movieSessionRegistry = new Map<string, StudioMovieSession>([
+  [localDemoSession.project.projectId, localDemoSession],
+]);
+
+function announceMovieSession(session: StudioMovieSession): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("aistudio:movie-session-change", {
+    detail: { projectId: session.project.projectId },
+  }));
+}
+
+export function registerMovieSession(session: StudioMovieSession): StudioMovieSession {
+  const validated = validateMovieSession(session);
+  movieSessionRegistry.set(validated.project.projectId, validated);
+  announceMovieSession(validated);
+  return validated;
+}
+
+export function resetLocalDemoMovieSession(): StudioMovieSession {
+  movieSessionRegistry.set(localDemoSession.project.projectId, localDemoSession);
+  announceMovieSession(localDemoSession);
+  return localDemoSession;
+}
 
 export function movieSessionForProjectId(projectId: string | null): StudioMovieSession | null {
-  return projectId === localDemoSession.project.projectId ? localDemoSession : null;
+  if (projectId === null) return null;
+  return movieSessionRegistry.get(projectId) ?? null;
 }
