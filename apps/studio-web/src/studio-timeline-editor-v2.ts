@@ -465,8 +465,11 @@ window.addEventListener("aistudio:movie-session-change", () => {
 });
 
 export function installStudioTimelineEditor(): void {
-  const observer = new MutationObserver(scheduleSync);
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+  const root = document.querySelector<HTMLElement>("#app");
+  if (root !== null) {
+    const observer = new MutationObserver(scheduleSync);
+    observer.observe(root, { childList: true });
+  }
   scheduleSync();
 }
 
