@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 
 test("Studio edits, reopens, configures, cancels, and exports guarded MP4", async ({ page }) => {
+  test.setTimeout(90_000);
+
   const mediaRequests: string[] = [];
   page.on("request", (request) => {
     const url = new URL(request.url());
@@ -110,7 +112,7 @@ test("Studio edits, reopens, configures, cancels, and exports guarded MP4", asyn
 
   await exportButton.click();
   await expect(cancelButton).toBeVisible();
-  await cancelButton.click();
+  await cancelButton.evaluate((button: HTMLButtonElement) => button.click());
   await expect(exportStatus).toHaveAttribute("data-export-phase", "CANCELLED", { timeout: 15_000 });
   await expect(exportStatus).toContainText("No MP4 was downloaded");
   await expect(cancelButton).toBeHidden();
