@@ -8,6 +8,8 @@ test("controlled Android Runtime streams the real MP4 export through the native 
     const capture = {
       beginRequest: null as null | { fileName?: string; mimeType?: string },
       bytesWritten: 0,
+      appendCalls: 0,
+      maxBase64ChunkChars: 0,
       finishCalls: 0,
       abortCalls: 0,
       inspectionCalls: 0,
@@ -24,6 +26,8 @@ test("controlled Android Runtime streams the real MP4 export through the native 
       },
       appendFileChunk(sessionId: string, base64Chunk: string) {
         if (sessionId !== "browser-native-export") return JSON.stringify({ ok: false, message: "wrong session" });
+        capture.appendCalls += 1;
+        capture.maxBase64ChunkChars = Math.max(capture.maxBase64ChunkChars, base64Chunk.length);
         capture.bytesWritten += atob(base64Chunk).length;
         return JSON.stringify({ ok: true, bytesWritten: capture.bytesWritten });
       },
@@ -90,6 +94,8 @@ test("controlled Android Runtime streams the real MP4 export through the native 
       __runtimeNativeExportCapture?: {
         beginRequest: { fileName?: string; mimeType?: string } | null;
         bytesWritten: number;
+        appendCalls: number;
+        maxBase64ChunkChars: number;
         finishCalls: number;
         abortCalls: number;
         inspectionCalls: number;
@@ -107,6 +113,10 @@ test("controlled Android Runtime streams the real MP4 export through the native 
     mimeType: "video/mp4",
   });
   expect(capture?.bytesWritten ?? 0).toBeGreaterThan(1_000);
+  expect(capture?.appendCalls ?? 0).toBeGreaterThan(0);
+  // The Java bridge rejects Base64 chunks above 1,500,000 characters. The Web side
+  // deliberately streams 512 KiB binary chunks, keeping this contract comfortably below the limit.
+  expect(capture?.maxBase64ChunkChars ?? Number.MAX_SAFE_INTEGER).toBeLessThanOrEqual(1_500_000);
   expect(capture?.finishCalls).toBe(1);
   expect(capture?.abortCalls).toBe(0);
   expect(capture?.inspectionCalls).toBe(1);
