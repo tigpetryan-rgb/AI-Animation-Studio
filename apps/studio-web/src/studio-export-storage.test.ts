@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   STUDIO_STREAMING_STORAGE_HEADROOM_BYTES,
   evaluateStudioStreamingStorageBudget,
+  isMp4VideoMimeType,
 } from "./studio-export-storage";
 
 describe("Studio streaming export storage budget", () => {
@@ -37,5 +38,13 @@ describe("Studio streaming export storage budget", () => {
     expect(budget.sufficient).toBe(true);
     expect(budget.availableBytes).toBeNull();
     expect(budget.message).toContain("quota is unknown");
+  });
+
+  it("accepts codec-qualified MP4 MIME values from fragmented exporters", () => {
+    expect(isMp4VideoMimeType("video/mp4")).toBe(true);
+    expect(isMp4VideoMimeType('video/mp4;codecs="avc1.42001E,mp4a.40.2"')).toBe(true);
+    expect(isMp4VideoMimeType('video/mp4; codecs="avc1.42001E,opus"')).toBe(true);
+    expect(isMp4VideoMimeType("audio/mp4")).toBe(false);
+    expect(isMp4VideoMimeType("video/webm")).toBe(false);
   });
 });
