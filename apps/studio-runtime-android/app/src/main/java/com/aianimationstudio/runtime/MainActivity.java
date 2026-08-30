@@ -4,8 +4,11 @@ import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.Insets;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.view.WindowInsets;
 import android.webkit.CookieManager;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.ValueCallback;
@@ -42,7 +45,8 @@ public final class MainActivity extends Activity {
                 .build();
 
         webView = new WebView(this);
-        webView.setBackgroundColor(Color.rgb(17, 19, 24));
+        webView.setBackgroundColor(Color.rgb(9, 10, 13));
+        applySystemBarInsets(webView);
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -59,7 +63,28 @@ public final class MainActivity extends Activity {
         webView.setWebChromeClient(new RuntimeWebChromeClient());
 
         setContentView(webView);
+        webView.requestApplyInsets();
         webView.loadUrl(STUDIO_URL);
+    }
+
+    @SuppressWarnings("deprecation")
+    private void applySystemBarInsets(WebView view) {
+        view.setOnApplyWindowInsetsListener((target, windowInsets) -> {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Insets bars = windowInsets.getInsets(
+                        WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout()
+                );
+                target.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            } else {
+                target.setPadding(
+                        windowInsets.getSystemWindowInsetLeft(),
+                        windowInsets.getSystemWindowInsetTop(),
+                        windowInsets.getSystemWindowInsetRight(),
+                        windowInsets.getSystemWindowInsetBottom()
+                );
+            }
+            return windowInsets;
+        });
     }
 
     private boolean isControlledStudioUri(Uri uri) {
