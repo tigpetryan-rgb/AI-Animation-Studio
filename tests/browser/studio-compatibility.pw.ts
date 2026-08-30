@@ -15,7 +15,7 @@ test("Studio opens projects and gates export safely on this browser profile", as
     const prefix = "[aistudio-compat-diag]";
     const snapshot = (): string => {
       const root = document.querySelector<HTMLElement>("#app");
-      const label = root?.querySelector<HTMLElement>(".assets-panel > p.muted")?.textContent ?? "<missing>";
+      const label = root?.querySelector<HTMLElement>(".assets-panel > h2 + p.muted")?.textContent ?? "<missing>";
       return `rootChildren=${root?.childElementCount ?? -1} label=${JSON.stringify(label)}`;
     };
     const log = (phase: string): void => console.log(`${prefix} ${phase} ${snapshot()}`);
@@ -66,7 +66,7 @@ test("Studio opens projects and gates export safely on this browser profile", as
 
   await page.getByRole("button", { name: "Open local demo" }).click();
 
-  const projectLabel = page.locator(".assets-panel > p.muted");
+  const projectLabel = page.locator(".assets-panel > h2 + p.muted");
   try {
     await expect(projectLabel).toHaveText("local-demo-project", { timeout: 5_000 });
   } catch (error) {
