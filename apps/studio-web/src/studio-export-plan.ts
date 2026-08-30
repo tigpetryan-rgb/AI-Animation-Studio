@@ -38,6 +38,7 @@ export const DEFAULT_STUDIO_EXPORT_SETTINGS: StudioExportSettings = Object.freez
 
 export const MAX_IN_MEMORY_EXPORT_BYTES = 768 * 1024 * 1024;
 export const WARN_IN_MEMORY_EXPORT_BYTES = 256 * 1024 * 1024;
+export const MAX_STREAMING_PEAK_WORKING_BYTES = 256 * 1024 * 1024;
 export const MAX_EXPORT_PIXELS = 1920 * 1080;
 
 const QUALITY_BITS_PER_PIXEL_FRAME: Readonly<Record<ExportQualityPreset, number>> = Object.freeze({
@@ -109,6 +110,8 @@ export function planStudioExport(
     blockedReason = `This build limits in-browser MP4 export to 1920×1080; requested ${width}×${height}.`;
   } else if (storageMode === "memory" && estimatedOutputBytes > MAX_IN_MEMORY_EXPORT_BYTES) {
     blockedReason = `Estimated MP4 size ${formatMegabytes(estimatedOutputBytes)} exceeds the current ${formatMegabytes(MAX_IN_MEMORY_EXPORT_BYTES)} in-memory export safety limit.`;
+  } else if (storageMode === "streaming" && estimatedPeakWorkingBytes > MAX_STREAMING_PEAK_WORKING_BYTES) {
+    blockedReason = `Estimated streaming working set ${formatMegabytes(estimatedPeakWorkingBytes)} exceeds the current ${formatMegabytes(MAX_STREAMING_PEAK_WORKING_BYTES)} browser safety limit.`;
   }
 
   let warning: string | null = null;
