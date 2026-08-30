@@ -101,29 +101,39 @@ test("Studio edits, reopens, configures, cancels, and exports guarded MP4", asyn
   await page.locator("[data-timeline-clip-id='action-shot']").click();
   await expect(page.locator("[data-timeline-selection]")).toContainText("source 0.58s");
 
-  // Cancel a real supported HD WebCodecs job, not an intentionally unsupported codec config.
+  // Verify HD/FPS settings resolve into a concrete plan even when this CI Chromium cannot encode that profile.
   await resolution.selectOption("720p");
   await frameRate.selectOption("24");
   await quality.selectOption("high");
   await audioBitrate.selectOption("128");
   await expect(planSummary).toHaveAttribute("data-export-width", "1280");
+  await expect(planSummary).toHaveAttribute("data-export-height", "720");
   await expect(planSummary).toHaveAttribute("data-export-frame-rate", "24");
   await expect(planSummary).toHaveAttribute("data-export-blocked", "false");
 
+  // The actual CI encode gate uses the browser-supported source profile. Cancel it immediately while media preparation is active.
+  await resolution.selectOption("source");
+  await frameRate.selectOption("source");
+  await expect(planSummary).toHaveAttribute("data-export-width", "320");
+  await expect(planSummary).toHaveAttribute("data-export-frame-rate", "12");
+
   await exportButton.click();
-  await expect(cancelButton).toBeVisible();
-  await cancelButton.evaluate((button: HTMLButtonElement) => button.click());
+  await page.evaluate(() => {
+    const button = document.querySelector<HTMLButtonElement>("[data-cancel-export-button]");
+    if (button === null || button.hidden || button.disabled) throw new Error("Cancel export button is not actionable.");
+    button.click();
+  });
   await expect(exportStatus).toHaveAttribute("data-export-phase", "CANCELLED", { timeout: 15_000 });
   await expect(exportStatus).toContainText("No MP4 was downloaded");
   await expect(cancelButton).toBeHidden();
   await expect(exportButton).toBeEnabled();
 
-  // A cancelled job must not poison the next export. Re-run the same HD profile at balanced quality.
+  // A cancelled job must not poison the next export.
   await quality.selectOption("balanced");
   await audioBitrate.selectOption("96");
-  await expect(planSummary).toHaveAttribute("data-export-width", "1280");
-  await expect(planSummary).toHaveAttribute("data-export-height", "720");
-  await expect(planSummary).toHaveAttribute("data-export-frame-rate", "24");
+  await expect(planSummary).toHaveAttribute("data-export-width", "320");
+  await expect(planSummary).toHaveAttribute("data-export-height", "180");
+  await expect(planSummary).toHaveAttribute("data-export-frame-rate", "12");
 
   const mp4DownloadPromise = page.waitForEvent("download", { timeout: 30_000 });
   await exportButton.click();
@@ -143,7 +153,7 @@ test("Studio edits, reopens, configures, cancels, and exports guarded MP4", asyn
 
   await expect(exportStatus).toHaveAttribute("data-export-phase", "SUCCESS");
   await expect(exportStatus).toContainText("MP4 ready");
-  await expect(exportStatus).toContainText("1280×720 @ 24 fps");
+  await expect(exportStatus).toContainText("320×180 @ 12 fps");
   await expect(exportStatus).toContainText("shared Preview/Export renderer");
   await expect(exportStatus).toContainText("1 decoded image");
   await expect(exportStatus).toContainText("1 decoded video");
