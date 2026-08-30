@@ -71,14 +71,14 @@ export function browserStudioCodecCapabilityProbe(): StudioCodecCapabilityProbe 
   return {
     async video(config) {
       try {
-        return (await VideoEncoder.isConfigSupported(config)).supported;
+        return (await VideoEncoder.isConfigSupported(config)).supported === true;
       } catch {
         return false;
       }
     },
     async audio(config) {
       try {
-        return (await AudioEncoder.isConfigSupported(config)).supported;
+        return (await AudioEncoder.isConfigSupported(config)).supported === true;
       } catch {
         return false;
       }
