@@ -27,7 +27,7 @@ test("controlled Android Runtime is chat-first and hides technical Studio panels
   await enableControlledAndroidRuntime(page);
 
   await expect(page.getByText("What do you want to create?", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("Message")).toBeVisible();
+  await expect(page.getByLabel("Message", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Add media")).toBeVisible();
   await expect(page.getByLabel("Chat menu")).toBeVisible();
   await expect(page.getByLabel("Open chats menu")).toBeVisible();
@@ -48,7 +48,7 @@ test("controlled Android Runtime is chat-first and hides technical Studio panels
   const drawerLauncherBox = await page.getByLabel("Open chats menu").boundingBox();
   expect(drawerLauncherBox).not.toBeNull();
   expect(drawerLauncherBox?.x ?? Number.MAX_SAFE_INTEGER).toBeLessThanOrEqual(20);
-  expect((drawerLauncherBox?.y ?? 0) + (drawerLauncherBox?.height ?? 0)).toBeGreaterThan(700);
+  expect(drawerLauncherBox?.y ?? Number.MAX_SAFE_INTEGER).toBeLessThanOrEqual(20);
 });
 
 test("chat composer accepts prompt plus media and emits one orchestration event", async ({ page }) => {
@@ -78,12 +78,12 @@ test("chat composer accepts prompt plus media and emits one orchestration event"
   });
   await expect(page.getByText("reference.png", { exact: true })).toBeVisible();
 
-  await page.getByLabel("Message").fill("Create a cinematic mountain reveal");
+  await page.getByLabel("Message", { exact: true }).fill("Create a cinematic mountain reveal");
   await page.getByLabel("Send message").click();
 
   await expect(page.getByText("Create a cinematic mountain reveal", { exact: true })).toBeVisible();
   await expect(page.locator("[data-runtime-message=\"user\"]").getByText("reference.png", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("Message")).toHaveValue("");
+  await expect(page.getByLabel("Message", { exact: true })).toHaveValue("");
 
   const submitted = await page.evaluate(() => (window as unknown as { __chatSubmit?: unknown }).__chatSubmit);
   expect(submitted).toMatchObject({
@@ -114,7 +114,7 @@ test("left drawer contains new chat history projects creation and archive", asyn
   await page.goto("/");
   await enableControlledAndroidRuntime(page);
 
-  await page.getByLabel("Message").fill("First saved conversation");
+  await page.getByLabel("Message", { exact: true }).fill("First saved conversation");
   await page.getByLabel("Send message").click();
   await page.getByLabel("Open chats menu").click();
 
