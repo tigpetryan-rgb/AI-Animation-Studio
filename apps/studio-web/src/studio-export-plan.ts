@@ -4,6 +4,7 @@ export type ExportResolutionPreset = "source" | "720p" | "1080p";
 export type ExportFrameRatePreset = "source" | "24" | "30";
 export type ExportQualityPreset = "draft" | "balanced" | "high";
 export type ExportAudioBitratePreset = "64" | "96" | "128";
+export type ExportStorageMode = "memory" | "streaming";
 
 export interface StudioExportSettings {
   readonly resolution: ExportResolutionPreset;
@@ -23,6 +24,7 @@ export interface StudioExportPlan {
   readonly audioBitrate: number;
   readonly estimatedOutputBytes: number;
   readonly estimatedPeakWorkingBytes: number;
+  readonly storageMode: ExportStorageMode;
   readonly warning: string | null;
   readonly blockedReason: string | null;
 }
@@ -73,6 +75,7 @@ export function planStudioExport(
   profile: MovieExportProfile,
   durationSeconds: number,
   settings: StudioExportSettings,
+  storageMode: ExportStorageMode = "memory",
 ): StudioExportPlan {
   if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
     throw new RangeError("Export duration must be a positive finite number.");
@@ -85,29 +88,36 @@ export function planStudioExport(
   const resolvedVideoBitrate = videoBitrate(width, height, frameRate, settings.quality);
   const resolvedAudioBitrate = Number(settings.audioBitrate) * 1000 * profile.numberOfChannels;
 
-  // Current MP4 export is an in-memory mux. Estimate encoded payload plus small container overhead,
-  // then account for several RGBA surfaces, encoder queues, and the final contiguous MP4 copy.
   const encodedPayloadBytes = (resolvedVideoBitrate + resolvedAudioBitrate) * durationSeconds / 8;
   const estimatedOutputBytes = Math.ceil(encodedPayloadBytes * 1.04 + 256 * 1024);
   const rgbaSurfaceBytes = width * height * 4;
-  const estimatedPeakWorkingBytes = Math.ceil(
-    estimatedOutputBytes * 2.15
-    + rgbaSurfaceBytes * 8
-    + 32 * 1024 * 1024,
-  );
+  const oneSecondEncodedBytes = (resolvedVideoBitrate + resolvedAudioBitrate) / 8;
+  const estimatedPeakWorkingBytes = storageMode === "streaming"
+    ? Math.ceil(
+      rgbaSurfaceBytes * 8
+      + oneSecondEncodedBytes * 3
+      + 48 * 1024 * 1024,
+    )
+    : Math.ceil(
+      estimatedOutputBytes * 2.15
+      + rgbaSurfaceBytes * 8
+      + 32 * 1024 * 1024,
+    );
 
   let blockedReason: string | null = null;
   if (width * height > MAX_EXPORT_PIXELS) {
     blockedReason = `This build limits in-browser MP4 export to 1920×1080; requested ${width}×${height}.`;
-  } else if (estimatedOutputBytes > MAX_IN_MEMORY_EXPORT_BYTES) {
+  } else if (storageMode === "memory" && estimatedOutputBytes > MAX_IN_MEMORY_EXPORT_BYTES) {
     blockedReason = `Estimated MP4 size ${formatMegabytes(estimatedOutputBytes)} exceeds the current ${formatMegabytes(MAX_IN_MEMORY_EXPORT_BYTES)} in-memory export safety limit.`;
   }
 
   let warning: string | null = null;
-  if (blockedReason === null && estimatedOutputBytes >= WARN_IN_MEMORY_EXPORT_BYTES) {
+  if (blockedReason === null && storageMode === "memory" && estimatedOutputBytes >= WARN_IN_MEMORY_EXPORT_BYTES) {
     warning = `Large in-memory export: about ${formatMegabytes(estimatedOutputBytes)} output and ${formatMegabytes(estimatedPeakWorkingBytes)} estimated peak working memory.`;
-  } else if (blockedReason === null && estimatedPeakWorkingBytes >= 512 * 1024 * 1024) {
+  } else if (blockedReason === null && storageMode === "memory" && estimatedPeakWorkingBytes >= 512 * 1024 * 1024) {
     warning = `This export may need about ${formatMegabytes(estimatedPeakWorkingBytes)} of peak working memory.`;
+  } else if (blockedReason === null && storageMode === "streaming" && estimatedOutputBytes >= 2 * 1024 * 1024 * 1024) {
+    warning = `Large disk-backed export: about ${formatMegabytes(estimatedOutputBytes)} output. Streaming keeps the encoded movie out of RAM, but sufficient local storage is required.`;
   }
 
   return Object.freeze({
@@ -121,6 +131,7 @@ export function planStudioExport(
     audioBitrate: resolvedAudioBitrate,
     estimatedOutputBytes,
     estimatedPeakWorkingBytes,
+    storageMode,
     warning,
     blockedReason,
   });
@@ -129,5 +140,6 @@ export function planStudioExport(
 export function exportPlanSummary(plan: StudioExportPlan): string {
   const outputMb = plan.estimatedOutputBytes / (1024 * 1024);
   const peakMb = plan.estimatedPeakWorkingBytes / (1024 * 1024);
-  return `${plan.width}×${plan.height} @ ${plan.frameRate} fps · video ${(plan.videoBitrate / 1_000_000).toFixed(2)} Mbps · audio ${Math.round(plan.audioBitrate / 1000)} kbps · est. ${outputMb.toFixed(outputMb >= 100 ? 0 : 1)} MB output / ${peakMb.toFixed(0)} MB peak`;
+  const storageLabel = plan.storageMode === "streaming" ? "disk-streamed" : "in-memory";
+  return `${plan.width}×${plan.height} @ ${plan.frameRate} fps · video ${(plan.videoBitrate / 1_000_000).toFixed(2)} Mbps · audio ${Math.round(plan.audioBitrate / 1000)} kbps · est. ${outputMb.toFixed(outputMb >= 100 ? 0 : 1)} MB output / ${peakMb.toFixed(0)} MB peak · ${storageLabel}`;
 }
