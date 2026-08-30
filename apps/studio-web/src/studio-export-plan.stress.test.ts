@@ -11,7 +11,7 @@ const profile: MovieExportProfile = Object.freeze({
   height: 1080,
   frameRate: 30,
   sampleRate: 48_000,
-  numberOfChannels: 2,
+  numberOfChannels: 1,
 });
 
 const settings: StudioExportSettings = Object.freeze({
