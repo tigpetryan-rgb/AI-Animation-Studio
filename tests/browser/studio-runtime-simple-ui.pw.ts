@@ -81,8 +81,9 @@ test("chat composer accepts prompt plus media and emits one orchestration event"
   await page.getByLabel("Message", { exact: true }).fill("Create a cinematic mountain reveal");
   await page.getByLabel("Send message").click();
 
-  await expect(page.getByText("Create a cinematic mountain reveal", { exact: true })).toBeVisible();
-  await expect(page.locator("[data-runtime-message=\"user\"]").getByText("reference.png", { exact: true })).toBeVisible();
+  const userMessage = page.locator("[data-runtime-message=\"user\"]");
+  await expect(userMessage.getByText("Create a cinematic mountain reveal", { exact: true })).toBeVisible();
+  await expect(userMessage.getByRole("img", { name: "reference.png", exact: true })).toBeVisible();
   await expect(page.getByLabel("Message", { exact: true })).toHaveValue("");
 
   const submitted = await page.evaluate(() => (window as unknown as { __chatSubmit?: unknown }).__chatSubmit);
