@@ -61,6 +61,7 @@ jobs:
             -PstudioCommitSha="${AISTUDIO_SOURCE_SHA}" \
             -PstudioSourceDate="${AISTUDIO_SOURCE_DATE}" \
             -PruntimeVersion="0.1.0-ci+${AISTUDIO_SOURCE_SHA:0:12}" \
+            -PruntimeVersionCode="${GITHUB_RUN_NUMBER}" \
             --no-daemon
           test -s app/build/outputs/apk/debug/app-debug.apk
 

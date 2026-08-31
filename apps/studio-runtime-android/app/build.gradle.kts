@@ -7,6 +7,10 @@ val sha40 = Regex("^[0-9a-f]{40}$")
 val studioCommitSha = providers.gradleProperty("studioCommitSha").orElse(zeroSha)
 val studioSourceDate = providers.gradleProperty("studioSourceDate").orElse("1970-01-01T00:00:00.000Z")
 val runtimeVersion = providers.gradleProperty("runtimeVersion").orElse("0.1.0-dev")
+val runtimeVersionCode = providers.gradleProperty("runtimeVersionCode").orElse("1").map { value ->
+    value.toIntOrNull()?.takeIf { it > 0 }
+        ?: throw GradleException("runtimeVersionCode must be a positive integer.")
+}
 
 if (!sha40.matches(studioCommitSha.get())) {
     throw GradleException("studioCommitSha must be a 40-character lowercase hexadecimal commit SHA.")
@@ -16,16 +20,28 @@ fun quotedBuildConfig(value: String): String = "\"" + value.replace("\\", "\\\\"
 
 val repoRoot = rootProject.projectDir.resolve("../..").canonicalFile
 val generatedStudioAssets = layout.buildDirectory.dir("generated/studio-assets")
+val m55UpdateKeystore = rootProject.file("keystore/m55-update-debug.jks")
 
 android {
     namespace = "com.aianimationstudio.runtime"
     compileSdk = 36
 
+    signingConfigs {
+        getByName("debug") {
+            // Development-only stable key: keeps M55 test APKs update-compatible across CI runners.
+            // Production releases must use a separate protected signing identity.
+            storeFile = m55UpdateKeystore
+            storePassword = "m55devupdate"
+            keyAlias = "m55-dev-update"
+            keyPassword = "m55devupdate"
+        }
+    }
+
     defaultConfig {
         applicationId = "com.aianimationstudio.runtime"
         minSdk = 29
         targetSdk = 36
-        versionCode = 1
+        versionCode = runtimeVersionCode.get()
         versionName = runtimeVersion.get()
 
         buildConfigField("String", "STUDIO_REPOSITORY", quotedBuildConfig("tigpetryan-rgb/AI-Animation-Studio"))
