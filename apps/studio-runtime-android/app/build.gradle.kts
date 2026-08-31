@@ -7,9 +7,28 @@ val sha40 = Regex("^[0-9a-f]{40}$")
 val studioCommitSha = providers.gradleProperty("studioCommitSha").orElse(zeroSha)
 val studioSourceDate = providers.gradleProperty("studioSourceDate").orElse("1970-01-01T00:00:00.000Z")
 val runtimeVersion = providers.gradleProperty("runtimeVersion").orElse("0.1.0-dev")
+val generationApiBaseUrl = providers.gradleProperty("generationApiBaseUrl").orElse("").map { it.trim().trimEnd('/') }
 
 if (!sha40.matches(studioCommitSha.get())) {
     throw GradleException("studioCommitSha must be a 40-character lowercase hexadecimal commit SHA.")
+}
+
+val generationApiBaseUrlValue = generationApiBaseUrl.get()
+if (generationApiBaseUrlValue.isNotEmpty()) {
+    val generationUri = try {
+        java.net.URI(generationApiBaseUrlValue)
+    } catch (error: java.net.URISyntaxException) {
+        throw GradleException("generationApiBaseUrl must be a valid HTTPS URL.", error)
+    }
+    if (
+        generationUri.scheme != "https"
+        || generationUri.host.isNullOrBlank()
+        || generationUri.userInfo != null
+        || generationUri.query != null
+        || generationUri.fragment != null
+    ) {
+        throw GradleException("generationApiBaseUrl must be an HTTPS origin/path without credentials, query, or fragment.")
+    }
 }
 
 fun quotedBuildConfig(value: String): String = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
@@ -31,6 +50,7 @@ android {
         buildConfigField("String", "STUDIO_REPOSITORY", quotedBuildConfig("tigpetryan-rgb/AI-Animation-Studio"))
         buildConfigField("String", "STUDIO_COMMIT_SHA", quotedBuildConfig(studioCommitSha.get()))
         buildConfigField("String", "STUDIO_SOURCE_DATE", quotedBuildConfig(studioSourceDate.get()))
+        buildConfigField("String", "GENERATION_API_BASE_URL", quotedBuildConfig(generationApiBaseUrlValue))
     }
 
     buildFeatures {
