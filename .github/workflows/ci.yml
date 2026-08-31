@@ -61,7 +61,6 @@ jobs:
             -PstudioCommitSha="${AISTUDIO_SOURCE_SHA}" \
             -PstudioSourceDate="${AISTUDIO_SOURCE_DATE}" \
             -PruntimeVersion="0.1.0-ci+${AISTUDIO_SOURCE_SHA:0:12}" \
-            -PgenerationApiBaseUrl="${{ vars.AISTUDIO_GENERATION_API_BASE_URL }}" \
             --no-daemon
           test -s app/build/outputs/apk/debug/app-debug.apk
 

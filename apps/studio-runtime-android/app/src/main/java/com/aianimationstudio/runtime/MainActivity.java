@@ -22,8 +22,6 @@ import android.webkit.WebViewClient;
 import androidx.annotation.Nullable;
 import androidx.webkit.WebViewAssetLoader;
 
-import org.json.JSONObject;
-
 public final class MainActivity extends Activity {
     private static final String STUDIO_ORIGIN = "https://appassets.androidplatform.net";
     private static final String STUDIO_URL = STUDIO_ORIGIN + "/assets/studio/index.html";
@@ -94,13 +92,6 @@ public final class MainActivity extends Activity {
 
     private boolean isControlledStudioUri(Uri uri) {
         return "https".equals(uri.getScheme()) && "appassets.androidplatform.net".equals(uri.getHost());
-    }
-
-    private void injectGenerationConfig(WebView view) {
-        String script = "window.AIStudioGenerationConfig={apiBaseUrl:"
-                + JSONObject.quote(BuildConfig.GENERATION_API_BASE_URL)
-                + "};window.dispatchEvent(new CustomEvent('aistudio:generation-config-ready'));";
-        view.evaluateJavascript(script, null);
     }
 
     private void cancelPendingFileChooser() {
@@ -177,12 +168,6 @@ public final class MainActivity extends Activity {
         @SuppressWarnings("deprecation")
         public boolean shouldOverrideUrlLoading(WebView view, String url) {
             return !isControlledStudioUri(Uri.parse(url));
-        }
-
-        @Override
-        public void onPageFinished(WebView view, String url) {
-            super.onPageFinished(view, url);
-            if (isControlledStudioUri(Uri.parse(url))) injectGenerationConfig(view);
         }
 
         @Override
