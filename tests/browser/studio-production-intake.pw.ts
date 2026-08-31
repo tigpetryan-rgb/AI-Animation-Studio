@@ -11,29 +11,56 @@ async function enableControlledAndroidRuntime(page: Page): Promise<void> {
   await expect(page.locator("[data-runtime-chat-shell]")).toBeVisible();
 }
 
-test("chat submission starts the internal production runtime and never silently waits", async ({ page }) => {
+const VALID_REFERENCE_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAQAAAADCAIAAAA7ljmRAAAAFElEQVR4nGPkUbJggAEmBiSAwgEADy4AbIVoKpMAAAAASUVORK5CYII=",
+  "base64",
+);
+
+test("chat validates the real reference, prepares deterministic scene blocking and advances to rehearsal", async ({ page }) => {
   await page.goto("/");
   await enableControlledAndroidRuntime(page);
   await page.locator("[data-runtime-file-input]").setInputFiles({
     name: "character-reference.png",
     mimeType: "image/png",
-    buffer: Buffer.from("character-reference-binary"),
+    buffer: VALID_REFERENCE_PNG,
   });
-  await page.getByLabel("Message", { exact: true }).fill("Create a ten second character scene and export MP4");
+  await page.getByLabel("Message", { exact: true }).fill("Create a 10 second character scene at 1920x1080, 24 fps and export MP4");
   await page.getByLabel("Send message").click();
 
   const status = page.locator("[data-runtime-production-status]");
   await expect(status).toBeVisible();
   await expect(status).toHaveAttribute("data-status", "WAITING_VALIDATION");
-  await expect(page.locator("[data-runtime-production-stage]")).toContainText("PLANNED");
-  await expect(page.locator("[data-runtime-production-steps]")).toContainText(/Reference|Референс|Reference մեդիա/);
-  await expect(page.locator("[data-runtime-production-message]")).not.toHaveText("");
+  await expect(page.locator("[data-runtime-production-stage]")).toContainText("REHEARSED");
+  await expect(page.locator("[data-runtime-production-step]").nth(3)).toHaveAttribute("data-complete", "true");
+  await expect(page.locator("[data-runtime-production-plan]")).toContainText("4×3");
+  await expect(page.locator("[data-runtime-production-plan]")).toContainText("1920×1080");
+  await expect(page.locator("[data-runtime-production-plan]")).toContainText("24 fps");
   await expect(page.locator("[data-runtime-generation-status]")).toHaveCount(0);
 
   const persisted = await page.evaluate(() => localStorage.getItem("aistudio.runtime.production-intake.v1"));
   expect(persisted).not.toBeNull();
-  expect(persisted).toContain("character");
-  expect(persisted).toContain("WAITING_VALIDATION");
+  const jobs = JSON.parse(persisted ?? "[]") as Array<{
+    stage?: string;
+    blocking?: { plan?: { placements?: unknown[]; paths?: unknown[] }; output?: { durationSeconds?: number } };
+  }>;
+  expect(jobs[0]?.stage).toBe("REHEARSED");
+  expect(jobs[0]?.blocking?.plan?.placements).toHaveLength(1);
+  expect(jobs[0]?.blocking?.plan?.paths).toHaveLength(1);
+  expect(jobs[0]?.blocking?.output?.durationSeconds).toBe(10);
+});
+
+test("scene blocking fails closed instead of fabricating a character when no image reference is attached", async ({ page }) => {
+  await page.goto("/");
+  await enableControlledAndroidRuntime(page);
+  await page.getByLabel("Message", { exact: true }).fill("Create a 10 second character scene");
+  await page.getByLabel("Send message").click();
+
+  const status = page.locator("[data-runtime-production-status]");
+  await expect(status).toHaveAttribute("data-status", "BLOCKED");
+  await expect(page.locator("[data-runtime-production-stage]")).toContainText("PLANNED");
+  await expect(page.locator("[data-runtime-production-step]").nth(3)).toHaveAttribute("data-complete", "false");
+  await expect(page.locator("[data-runtime-production-diagnostic]")).toContainText(/reference/i);
+  await expect(page.locator("[data-runtime-production-plan]")).toHaveCount(0);
 });
 
 test("runtime shell follows a reduced visual viewport so the composer stays above a soft keyboard", async ({ page }) => {

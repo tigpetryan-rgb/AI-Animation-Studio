@@ -12,6 +12,7 @@
     "@aistudio/core-time": "0.0.0",
     "@aistudio/core-types": "0.0.0",
     "@aistudio/media-export": "0.0.0",
+    "@aistudio/performance-engine": "0.0.0",
     "@aistudio/platform-capabilities": "0.0.0",
     "@aistudio/production-runtime": "0.0.0",
     "@aistudio/project-format": "0.0.0",

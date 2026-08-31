@@ -5,6 +5,11 @@ import {
   createProductionRuntime,
   type ProductionRuntime,
 } from "@aistudio/production-runtime";
+import {
+  isSceneBlockingArtifact,
+  prepareSceneBlocking,
+  type SceneBlockingArtifact,
+} from "./studio-scene-blocking";
 
 const CHAT_STORAGE_KEY = "aistudio.runtime.chat-state.v1";
 const PRODUCTION_STORAGE_KEY = "aistudio.runtime.production-intake.v1";
@@ -29,12 +34,13 @@ interface PersistedProductionJob {
   readonly startedAt: number;
   readonly updatedAt: number;
   readonly diagnostics: readonly string[];
+  readonly blocking?: SceneBlockingArtifact;
 }
 
 interface Copy {
-  readonly title: string;
   readonly planning: string;
-  readonly waiting: string;
+  readonly waitingBlocking: string;
+  readonly waitingActing: string;
   readonly blocked: string;
   readonly stage: string;
   readonly intake: string;
@@ -48,21 +54,24 @@ interface Copy {
   readonly pending: string;
   readonly complete: string;
   readonly noReferences: string;
-  readonly waitingDetail: string;
+  readonly planningDetail: string;
+  readonly blockingDetail: string;
+  readonly actingDetail: string;
   readonly blockedDetail: string;
+  readonly plan: string;
 }
 
 const COPY: Record<Locale, Copy> = {
   en: {
-    title: "Studio production",
-    planning: "Production started",
-    waiting: "Waiting for scene setup",
+    planning: "Preparing scene blocking",
+    waitingBlocking: "Waiting for scene setup",
+    waitingActing: "Scene blocking ready",
     blocked: "Production needs input",
     stage: "Stage",
     intake: "Production intake",
     story: "Story / shot plan",
     references: "Reference media",
-    blocking: "Scene blocking / character setup",
+    blocking: "Scene blocking / reference setup",
     acting: "Acting / animation",
     camera: "Camera",
     render: "Render",
@@ -70,19 +79,22 @@ const COPY: Record<Locale, Copy> = {
     pending: "Pending",
     complete: "Ready",
     noReferences: "No reference media attached",
-    waitingDetail: "The job is registered in Studio's production runtime. Story intake is accepted; scene blocking and character/performance execution are not wired into this build yet, so Studio stops here instead of pretending to render.",
-    blockedDetail: "The production runtime started, but a story prompt is required before scene blocking can begin.",
+    planningDetail: "Studio is validating the attached image and preparing a deterministic spatial blocking plan.",
+    blockingDetail: "The production runtime has the story, but scene blocking still needs a valid character image reference.",
+    actingDetail: "The character reference was decoded and deterministic scene blocking is ready. The shot advanced to REHEARSED. Acting/animation is the next real executor; camera execution, render and MP4 export have not started.",
+    blockedDetail: "Studio could not prepare a valid scene block from the supplied inputs. Fix the diagnostic below and submit again.",
+    plan: "Blocking plan",
   },
   hy: {
-    title: "Studio արտադրություն",
-    planning: "Արտադրությունը սկսված է",
-    waiting: "Սպասում է տեսարանի պատրաստմանը",
+    planning: "Պատրաստվում է տեսարանի blocking-ը",
+    waitingBlocking: "Սպասում է տեսարանի պատրաստմանը",
+    waitingActing: "Տեսարանի blocking-ը պատրաստ է",
     blocked: "Արտադրությանը տվյալ է պետք",
     stage: "Փուլ",
     intake: "Աշխատանքի ընդունում",
     story: "Սցենար / կադրերի պլան",
     references: "Reference մեդիա",
-    blocking: "Տեսարանի blocking / կերպարի պատրաստում",
+    blocking: "Տեսարանի blocking / reference պատրաստում",
     acting: "Դերասանական խաղ / անիմացիա",
     camera: "Տեսախցիկ",
     render: "Ռենդեր",
@@ -90,19 +102,22 @@ const COPY: Record<Locale, Copy> = {
     pending: "Սպասում է",
     complete: "Պատրաստ",
     noReferences: "Reference մեդիա կցված չէ",
-    waitingDetail: "Աշխատանքը գրանցվել է Studio-ի production runtime-ում։ Սցենարի ընդունումը կատարված է, բայց տեսարանի blocking-ի և կերպարի/դերասանական կատարման executor-ները այս build-ում դեռ միացված չեն։ Studio-ն այստեղ կանգ է առնում և չի ցույց տալիս կեղծ render progress։",
-    blockedDetail: "Production runtime-ը սկսվել է, բայց տեսարանի blocking-ին անցնելու համար պետք է սցենարային տեքստ։",
+    planningDetail: "Studio-ն ստուգում է կցված նկարը և պատրաստում deterministic տարածական blocking plan։",
+    blockingDetail: "Սցենարը ընդունված է, բայց scene blocking-ի համար դեռ պետք է վավեր կերպարի նկար-reference։",
+    actingDetail: "Կերպարի reference նկարը վավերացվել է և deterministic scene blocking-ը պատրաստ է։ Կադրը հասել է REHEARSED փուլին։ Հաջորդ իրական executor-ը դերասանական խաղ/անիմացիան է․ camera execution, render և MP4 export դեռ չեն սկսվել։",
+    blockedDetail: "Studio-ն մուտքային տվյալներից վավեր scene blocking չկարողացավ պատրաստել։ Ուղղիր ներքևի diagnostic-ը և նորից ուղարկիր։",
+    plan: "Blocking plan",
   },
   ru: {
-    title: "Производство Studio",
-    planning: "Производство запущено",
-    waiting: "Ожидание подготовки сцены",
+    planning: "Подготовка блокинга сцены",
+    waitingBlocking: "Ожидание подготовки сцены",
+    waitingActing: "Блокинг сцены готов",
     blocked: "Нужны данные для производства",
     stage: "Этап",
     intake: "Приём задания",
     story: "Сценарий / план кадров",
     references: "Референсные материалы",
-    blocking: "Блокинг сцены / подготовка персонажа",
+    blocking: "Блокинг сцены / подготовка референса",
     acting: "Актёрская игра / анимация",
     camera: "Камера",
     render: "Рендер",
@@ -110,13 +125,17 @@ const COPY: Record<Locale, Copy> = {
     pending: "Ожидает",
     complete: "Готово",
     noReferences: "Референсные материалы не прикреплены",
-    waitingDetail: "Задание зарегистрировано во внутреннем production runtime Studio. Сценарий принят, но исполнитель блокинга сцены и модуль персонажа/актёрской анимации в этой сборке ещё не подключены. Studio останавливается здесь и не показывает фиктивный прогресс рендера.",
-    blockedDetail: "Production runtime запущен, но перед блокингом сцены нужен текст сценария.",
+    planningDetail: "Studio проверяет прикреплённое изображение и готовит детерминированный пространственный план блокинга.",
+    blockingDetail: "Сценарий принят, но для блокинга сцены нужен корректный референс персонажа.",
+    actingDetail: "Референс персонажа декодирован, детерминированный блокинг сцены готов, и кадр перешёл в REHEARSED. Следующий реальный исполнитель — актёрская игра/анимация; камера, рендер и MP4 ещё не запускались.",
+    blockedDetail: "Studio не смогла подготовить корректный блокинг из входных данных. Исправьте diagnostic ниже и отправьте задание снова.",
+    plan: "План блокинга",
   },
 };
 
 const jobs = new Map<string, PersistedProductionJob>();
 const runtimes = new Map<string, ProductionRuntime>();
+const runVersionByChat = new Map<string, number>();
 let installed = false;
 
 function locale(): Locale {
@@ -157,17 +176,22 @@ function loadJobs(): void {
       const diagnostics = Array.isArray(value.diagnostics)
         ? value.diagnostics.filter((item): item is string => typeof item === "string")
         : [];
+      const blocking = isSceneBlockingArtifact(value.blocking) ? value.blocking : undefined;
+      const recoveredStatus: ProductionIntakeStatus = value.status === "PLANNING" ? "BLOCKED" : value.status;
       jobs.set(value.chatId, {
         chatId: value.chatId,
         projectId: value.projectId,
         shotId: value.shotId,
         prompt: value.prompt,
         referenceCount: value.referenceCount,
-        status: value.status,
+        status: recoveredStatus,
         stage: value.stage,
         startedAt: value.startedAt,
         updatedAt: value.updatedAt,
-        diagnostics,
+        diagnostics: value.status === "PLANNING" && blocking === undefined
+          ? [...diagnostics, "Interrupted scene setup requires the reference media to be attached again."]
+          : diagnostics,
+        ...(blocking === undefined ? {} : { blocking }),
       });
     }
   } catch {
@@ -210,6 +234,7 @@ function ensureStyles(): void {
     [data-runtime-production-step] [data-mark] { text-align: center; color: #8e97a5; }
     [data-runtime-production-step][data-complete="true"] [data-mark] { color: #dce5d4; }
     [data-runtime-production-step] [data-state] { color: #707987; }
+    [data-runtime-production-plan] { padding: 7px 9px; border: 1px solid #262c35; border-radius: 9px; color: #9fa8b5; font-size: 10px; line-height: 1.4; }
     [data-runtime-production-diagnostic] { color: #9da6b4; font-size: 10px; line-height: 1.4; }
   `;
   document.head.append(style);
@@ -247,6 +272,18 @@ function appendStep(list: HTMLElement, label: string, complete: boolean, stateTe
   list.append(row);
 }
 
+function titleFor(job: PersistedProductionJob, strings: Copy): string {
+  if (job.status === "BLOCKED") return strings.blocked;
+  if (job.status === "PLANNING") return strings.planning;
+  return job.blocking === undefined ? strings.waitingBlocking : strings.waitingActing;
+}
+
+function messageFor(job: PersistedProductionJob, strings: Copy): string {
+  if (job.status === "BLOCKED") return strings.blockedDetail;
+  if (job.status === "PLANNING") return strings.planningDetail;
+  return job.blocking === undefined ? strings.blockingDetail : strings.actingDetail;
+}
+
 function render(): void {
   const panel = ensurePanel();
   if (panel === null) return;
@@ -266,7 +303,7 @@ function render(): void {
   head.dataset.runtimeProductionHead = "true";
   const title = document.createElement("strong");
   title.dataset.runtimeProductionTitle = "true";
-  title.textContent = job.status === "BLOCKED" ? strings.blocked : job.status === "WAITING_VALIDATION" ? strings.waiting : strings.planning;
+  title.textContent = titleFor(job, strings);
   const stage = document.createElement("span");
   stage.dataset.runtimeProductionStage = "true";
   stage.textContent = `${strings.stage}: ${job.stage}`;
@@ -274,7 +311,7 @@ function render(): void {
 
   const message = document.createElement("div");
   message.dataset.runtimeProductionMessage = "true";
-  message.textContent = job.status === "BLOCKED" ? strings.blockedDetail : strings.waitingDetail;
+  message.textContent = messageFor(job, strings);
 
   const steps = document.createElement("ol");
   steps.dataset.runtimeProductionSteps = "true";
@@ -287,13 +324,21 @@ function render(): void {
     job.referenceCount > 0,
     job.referenceCount > 0 ? `${strings.complete} · ${job.referenceCount}` : strings.noReferences,
   );
-  appendStep(steps, strings.blocking, false, strings.pending);
+  appendStep(steps, strings.blocking, job.blocking !== undefined, job.blocking === undefined ? strings.pending : strings.complete);
   appendStep(steps, strings.acting, false, strings.pending);
   appendStep(steps, strings.camera, false, strings.pending);
   appendStep(steps, strings.render, false, strings.pending);
   appendStep(steps, strings.export, false, strings.pending);
 
   panel.append(head, message, steps);
+  if (job.blocking !== undefined) {
+    const plan = document.createElement("div");
+    plan.dataset.runtimeProductionPlan = "true";
+    const reference = job.blocking.reference;
+    const output = job.blocking.output;
+    plan.textContent = `${strings.plan}: ${reference.name} · ${reference.width}×${reference.height} → ${output.width}×${output.height} · ${output.frameRate} fps · ${output.durationSeconds}s`;
+    panel.append(plan);
+  }
   const diagnostic = job.diagnostics[0];
   if (diagnostic !== undefined) {
     const note = document.createElement("div");
@@ -303,9 +348,39 @@ function render(): void {
   }
 }
 
-function startProduction(detail: ChatSubmitDetail): void {
+function storeJob(job: PersistedProductionJob): void {
+  jobs.set(job.chatId, job);
+  persistJobs();
+  render();
+  window.dispatchEvent(new CustomEvent("aistudio:production-intake", { detail: job }));
+}
+
+function failJob(detail: ChatSubmitDetail, error: unknown): void {
+  const chatId = typeof detail.chatId === "string" ? detail.chatId : activeChatId();
+  if (chatId === null) return;
+  const previous = jobs.get(chatId);
+  const now = Date.now();
+  storeJob({
+    chatId,
+    projectId: previous?.projectId ?? `runtime-${chatId}`,
+    shotId: previous?.shotId ?? `shot-${chatId}`,
+    prompt: typeof detail.prompt === "string" ? detail.prompt : previous?.prompt ?? "",
+    referenceCount: Array.isArray(detail.files) ? detail.files.length : previous?.referenceCount ?? 0,
+    status: "BLOCKED",
+    stage: previous?.stage ?? "PLANNED",
+    startedAt: previous?.startedAt ?? now,
+    updatedAt: now,
+    diagnostics: [error instanceof Error ? error.message : "Production intake failed."],
+    ...(previous?.blocking === undefined ? {} : { blocking: previous.blocking }),
+  });
+}
+
+async function startProduction(detail: ChatSubmitDetail): Promise<void> {
   if (typeof detail.chatId !== "string") return;
   const chatId = detail.chatId;
+  const version = (runVersionByChat.get(chatId) ?? 0) + 1;
+  runVersionByChat.set(chatId, version);
+
   const prompt = typeof detail.prompt === "string" ? detail.prompt.trim() : "";
   const files = Array.isArray(detail.files) ? detail.files.filter((item): item is File => item instanceof File) : [];
   const projectId = `runtime-${chatId}`;
@@ -317,7 +392,24 @@ function startProduction(detail: ChatSubmitDetail): void {
   const runtime = createProductionRuntime(project, [shotId]);
   runtimes.set(chatId, runtime);
 
-  const result = advanceShotStage(runtime, shotId, "BLOCKED", {
+  const startedAt = Date.now();
+  storeJob({
+    chatId,
+    projectId,
+    shotId,
+    prompt,
+    referenceCount: files.length,
+    status: "PLANNING",
+    stage: "PLANNED",
+    startedAt,
+    updatedAt: startedAt,
+    diagnostics: ["Validating reference media and preparing scene blocking."],
+  });
+
+  const blockingResult = await prepareSceneBlocking({ chatId, prompt, files });
+  if (runVersionByChat.get(chatId) !== version) return;
+
+  const toBlocked = advanceShotStage(runtime, shotId, "BLOCKED", {
     gates: [
       {
         kind: "STORY",
@@ -327,65 +419,79 @@ function startProduction(detail: ChatSubmitDetail): void {
       },
       {
         kind: "BLOCKING",
-        passed: false,
-        hard: false,
-        message: "Scene blocking executor is not connected to runtime chat yet.",
+        passed: blockingResult.ok,
+        hard: true,
+        message: blockingResult.ok ? "Deterministic scene blocking prepared from validated reference media." : blockingResult.diagnostics[0] ?? "Scene blocking failed.",
       },
     ],
   });
 
-  if (result.accepted) runtimes.set(chatId, result.runtime);
-  const orchestrationStatus = result.orchestration?.status;
-  const status: ProductionIntakeStatus = result.accepted
-    ? "PLANNING"
-    : orchestrationStatus === "BLOCKED"
-      ? "BLOCKED"
-      : "WAITING_VALIDATION";
-  const diagnostics = result.accepted ? [] : result.diagnostics.map((item: { readonly message: string }) => item.message);
-  const now = Date.now();
-  const shot = result.runtime.shots[shotId];
-  const job: PersistedProductionJob = {
+  if (!toBlocked.accepted) {
+    const orchestrationStatus = toBlocked.orchestration?.status;
+    const shot = toBlocked.runtime.shots[shotId];
+    storeJob({
+      chatId,
+      projectId,
+      shotId,
+      prompt,
+      referenceCount: files.length,
+      status: orchestrationStatus === "BLOCKED" ? "BLOCKED" : "WAITING_VALIDATION",
+      stage: shot?.stage ?? "PLANNED",
+      startedAt,
+      updatedAt: Date.now(),
+      diagnostics: [...blockingResult.diagnostics, ...toBlocked.diagnostics.map((item) => item.message)],
+    });
+    return;
+  }
+
+  runtimes.set(chatId, toBlocked.runtime);
+  const toRehearsed = advanceShotStage(toBlocked.runtime, shotId, "REHEARSED", {
+    gates: [{
+      kind: "BLOCKING",
+      passed: blockingResult.artifact !== undefined,
+      hard: true,
+      message: blockingResult.artifact === undefined ? "Scene blocking artifact is missing." : "Scene blocking artifact retained for rehearsal.",
+    }],
+  });
+
+  if (!toRehearsed.accepted || blockingResult.artifact === undefined) {
+    const shot = toRehearsed.runtime.shots[shotId];
+    storeJob({
+      chatId,
+      projectId,
+      shotId,
+      prompt,
+      referenceCount: files.length,
+      status: toRehearsed.orchestration?.status === "BLOCKED" ? "BLOCKED" : "WAITING_VALIDATION",
+      stage: shot?.stage ?? "BLOCKED",
+      startedAt,
+      updatedAt: Date.now(),
+      diagnostics: toRehearsed.accepted ? ["Scene blocking artifact is missing."] : toRehearsed.diagnostics.map((item) => item.message),
+    });
+    return;
+  }
+
+  runtimes.set(chatId, toRehearsed.runtime);
+  const shot = toRehearsed.runtime.shots[shotId];
+  storeJob({
     chatId,
     projectId,
     shotId,
     prompt,
     referenceCount: files.length,
-    status,
-    stage: shot?.stage ?? "PLANNED",
-    startedAt: now,
-    updatedAt: now,
-    diagnostics,
-  };
-  jobs.set(chatId, job);
-  persistJobs();
-  render();
-  window.dispatchEvent(new CustomEvent("aistudio:production-intake", { detail: job }));
+    status: "WAITING_VALIDATION",
+    stage: shot?.stage ?? "REHEARSED",
+    startedAt,
+    updatedAt: Date.now(),
+    diagnostics: blockingResult.diagnostics,
+    blocking: blockingResult.artifact,
+  });
 }
 
 function onSubmit(event: Event): void {
   const detail = (event as CustomEvent<ChatSubmitDetail>).detail;
   if (detail === null || typeof detail !== "object") return;
-  try {
-    startProduction(detail);
-  } catch (error) {
-    const chatId = typeof detail.chatId === "string" ? detail.chatId : activeChatId();
-    if (chatId === null) return;
-    const now = Date.now();
-    jobs.set(chatId, {
-      chatId,
-      projectId: `runtime-${chatId}`,
-      shotId: `shot-${chatId}`,
-      prompt: typeof detail.prompt === "string" ? detail.prompt : "",
-      referenceCount: Array.isArray(detail.files) ? detail.files.length : 0,
-      status: "BLOCKED",
-      stage: "PLANNED",
-      startedAt: now,
-      updatedAt: now,
-      diagnostics: [error instanceof Error ? error.message : "Production intake failed."],
-    });
-    persistJobs();
-    render();
-  }
+  void startProduction(detail).catch((error) => failJob(detail, error));
 }
 
 function scheduleRender(): void {
