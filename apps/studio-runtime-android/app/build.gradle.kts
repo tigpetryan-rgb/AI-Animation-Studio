@@ -1,3 +1,6 @@
+import java.net.URI
+import java.net.URISyntaxException
+
 plugins {
     id("com.android.application")
 }
@@ -16,8 +19,8 @@ if (!sha40.matches(studioCommitSha.get())) {
 val generationApiBaseUrlValue = generationApiBaseUrl.get()
 if (generationApiBaseUrlValue.isNotEmpty()) {
     val generationUri = try {
-        java.net.URI(generationApiBaseUrlValue)
-    } catch (error: java.net.URISyntaxException) {
+        URI(generationApiBaseUrlValue)
+    } catch (error: URISyntaxException) {
         throw GradleException("generationApiBaseUrl must be a valid HTTPS URL.", error)
     }
     if (
