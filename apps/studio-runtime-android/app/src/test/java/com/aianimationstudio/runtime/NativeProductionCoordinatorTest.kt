@@ -39,6 +39,40 @@ class NativeProductionCoordinatorTest {
     }
 
     @Test
+    fun `physical proof wait script accepts exact inline output metadata`() {
+        val snapshot = NativeProductionCoordinator.prepare(
+            chatId = "physical-proof",
+            prompt = "ACTOR WAIT 2 seconds 320x240 12 fps.",
+            reference = reference,
+            sourceCommit = sourceCommit,
+        )
+
+        assertEquals(NativeProductionStage.READY_FOR_RENDER, snapshot.stage)
+        assertTrue(snapshot.performanceReady)
+        assertTrue(snapshot.cameraReady)
+        assertEquals(NativeStoryAction.WAIT, snapshot.story?.events?.single()?.type)
+        assertEquals(null, snapshot.story?.events?.single()?.targetId)
+        assertEquals(320, snapshot.blocking?.output?.width)
+        assertEquals(240, snapshot.blocking?.output?.height)
+        assertEquals(12.0, snapshot.blocking?.output?.frameRate ?: 0.0, 0.0)
+        assertEquals(2.0, snapshot.blocking?.output?.durationSeconds ?: 0.0, 0.0)
+    }
+
+    @Test
+    fun `wait output metadata projection remains fail closed for unknown suffix`() {
+        val snapshot = NativeProductionCoordinator.prepare(
+            chatId = "main",
+            prompt = "ACTOR WAIT 2 seconds nonsense 320x240 12 fps",
+            reference = reference,
+            sourceCommit = sourceCommit,
+        )
+
+        assertEquals(NativeProductionStage.BLOCKING_VALID, snapshot.stage)
+        assertTrue(snapshot.diagnostics.any { it.code == "STORY_UNEXPECTED_TARGET" })
+        assertFalse(snapshot.performanceReady)
+    }
+
+    @Test
     fun `natural language remains fail closed instead of fabricating story events`() {
         val snapshot = NativeProductionCoordinator.prepare(
             chatId = "main",

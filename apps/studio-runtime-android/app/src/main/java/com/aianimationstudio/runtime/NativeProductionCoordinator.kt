@@ -24,6 +24,42 @@ internal data class NativeProductionSnapshot(
     val renderReady: Boolean get() = false // becomes true only after the native frame renderer is ported and verified.
 }
 
+private object NativeStorySourceProjector {
+    private val waitWithSuffix = Regex("""^(\S+)\s+WAIT\s+(.+)$""", RegexOption.IGNORE_CASE)
+    private val outputMetadata = listOf(
+        Regex(
+            """\d{1,5}(?:[.,]\d+)?\s*(?:seconds?|secs?|sec|վայրկյան(?:անոց)?|վրկ|секунд(?:а|ы)?|сек)""",
+            RegexOption.IGNORE_CASE,
+        ),
+        Regex("""\d{2,5}\s*[x×х]\s*\d{2,5}""", RegexOption.IGNORE_CASE),
+        Regex(
+            """\d{1,3}(?:[.,]\d+)?\s*(?:fps|կադր\s*/\s*վրկ|кадр(?:ов)?\s*/\s*с)""",
+            RegexOption.IGNORE_CASE,
+        ),
+    )
+
+    fun project(prompt: String): String = prompt
+        .split(Regex("\\r?\\n"))
+        .joinToString("\n") { original ->
+            val match = waitWithSuffix.matchEntire(original.trim()) ?: return@joinToString original
+            if (!containsOnlyOutputMetadata(match.groupValues[2])) return@joinToString original
+            "${match.groupValues[1]} WAIT"
+        }
+
+    private fun containsOnlyOutputMetadata(value: String): Boolean {
+        var remainder = value
+        var matched = false
+        outputMetadata.forEach { pattern ->
+            if (pattern.containsMatchIn(remainder)) {
+                matched = true
+                remainder = pattern.replace(remainder, " ")
+            }
+        }
+        remainder = remainder.replace(Regex("""[\s.,;:()]+"""), "")
+        return matched && remainder.isEmpty()
+    }
+}
+
 internal object NativeProductionCoordinator {
     fun prepare(
         chatId: String,
@@ -62,7 +98,7 @@ internal object NativeProductionCoordinator {
                 aliases = listOf("ACTOR", "CHARACTER", blocking.actorId),
             ),
         )
-        val storyResult = NativeStoryCompiler.compile(prompt, registry)
+        val storyResult = NativeStoryCompiler.compile(NativeStorySourceProjector.project(prompt), registry)
         if (!storyResult.ok) {
             return NativeProductionSnapshot(
                 stage = NativeProductionStage.BLOCKING_VALID,
