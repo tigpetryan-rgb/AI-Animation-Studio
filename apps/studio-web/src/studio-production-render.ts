@@ -9,6 +9,10 @@ import {
   type ProductionRenderArtifact,
 } from "./studio-production-renderer";
 import {
+  persistProductionReferenceFile,
+  restoreProductionReferenceFile,
+} from "./studio-production-reference-store";
+import {
   createStudioStreamingExportFile,
   type StudioStreamingExportFinalization,
   type StudioStreamingExportFile,
@@ -58,6 +62,7 @@ interface LiveProductionRender {
 }
 
 const referenceFiles = new Map<string, File>();
+const referencePersistence = new Map<string, Promise<string>>();
 const live = new Map<string, LiveProductionRender>();
 const persisted = new Map<string, PersistedProductionRender>();
 const preparing = new Set<string>();
@@ -98,7 +103,7 @@ function loadPersisted(): void {
       persisted.set(candidate.chatId, candidate);
     }
   } catch {
-    // Exact-source render state is best effort. Live source pixels are never reconstructed from persistence.
+    // Exact-source render metadata is best effort. Exact source pixels are restored only from the verified byte store.
   }
 }
 
@@ -124,7 +129,12 @@ function markRow(panel: HTMLElement, label: "Render" | "MP4 export", complete: b
   if (spans[2] !== undefined) spans[2].textContent = state;
 }
 
-function ensureExportButton(panel: HTMLElement, chatId: string, status: RenderStatus): void {
+function ensureExportButton(
+  panel: HTMLElement,
+  chatId: string,
+  status: RenderStatus,
+  liveRendererReady: boolean,
+): void {
   let button = panel.querySelector<HTMLButtonElement>("[data-runtime-production-export]");
   if (button === null) {
     button = document.createElement("button");
@@ -139,20 +149,34 @@ function ensureExportButton(panel: HTMLElement, chatId: string, status: RenderSt
     panel.append(button);
     button.addEventListener("click", () => void exportProductionMp4(chatId));
   }
-  button.disabled = status === "EXPORTING" || status === "BLOCKED";
-  button.textContent = status === "EXPORTING" ? "Encoding H.264 + Opus…" : status === "MP4_READY" ? "Export MP4 again" : "Export H.264 + Opus MP4";
+  button.disabled = status === "EXPORTING" || status === "BLOCKED" || !liveRendererReady;
+  button.textContent = !liveRendererReady && status !== "BLOCKED"
+    ? "Restoring exact source…"
+    : status === "EXPORTING"
+      ? "Encoding H.264 + Opus…"
+      : status === "MP4_READY"
+        ? "Export MP4 again"
+        : "Export H.264 + Opus MP4";
 }
 
 function patchPanel(chatId: string): void {
   if (activeChatId() !== chatId) return;
-  const state = live.get(chatId)?.record ?? persisted.get(chatId);
+  const liveExecution = live.get(chatId);
+  const state = liveExecution?.record ?? persisted.get(chatId);
   if (state === undefined) return;
   const panel = document.querySelector<HTMLElement>("[data-runtime-production-status]");
   if (panel === null) return;
-  panel.dataset.renderReady = String(state.status === "RENDER_READY" || state.status === "EXPORTING" || state.status === "MP4_READY");
+  const liveRendererReady = liveExecution !== undefined;
+  const renderComplete = state.status !== "BLOCKED" && (liveRendererReady || state.status === "MP4_READY");
+  panel.dataset.renderReady = String(liveRendererReady && (state.status === "RENDER_READY" || state.status === "EXPORTING" || state.status === "MP4_READY"));
   panel.dataset.mp4Ready = String(state.status === "MP4_READY");
   panel.dataset.renderSourceCommit = state.sourceCommit;
-  markRow(panel, "Render", state.status !== "BLOCKED", state.status === "BLOCKED" ? "Blocked" : "Ready");
+  markRow(
+    panel,
+    "Render",
+    renderComplete,
+    state.status === "BLOCKED" ? "Blocked" : liveRendererReady ? "Ready" : state.status === "MP4_READY" ? "Ready" : "Restoring",
+  );
   markRow(panel, "MP4 export", state.status === "MP4_READY", state.status === "EXPORTING" ? "Encoding" : state.status === "MP4_READY" ? "Ready" : "Pending");
 
   let plan = panel.querySelector<HTMLElement>("[data-runtime-render-plan]");
@@ -172,12 +196,14 @@ function patchPanel(chatId: string): void {
     plan.textContent = state.diagnostics[0] ?? "Render is blocked.";
   }
 
-  ensureExportButton(panel, chatId, state.status);
+  ensureExportButton(panel, chatId, state.status, liveRendererReady);
   const message = panel.querySelector<HTMLElement>("[data-runtime-production-message]");
   if (message !== null) {
     if (state.status === "MP4_READY") {
       const native = state.mp4?.nativeVerified === true ? " · Android native MP4 verification PASS" : "";
       message.textContent = `Rendered animated exact-source frames and completed H.264 + Opus MP4${native}.`;
+    } else if (!liveRendererReady && state.status !== "BLOCKED") {
+      message.textContent = "Restoring the exact persisted reference bytes before production export is re-enabled.";
     } else if (state.status === "EXPORTING") {
       message.textContent = "Encoding sampled production frames through the Studio H.264 + Opus MP4 path.";
     } else if (state.status === "RENDER_READY") {
@@ -218,8 +244,13 @@ function onChatSubmit(event: Event): void {
   if (detail === null || typeof detail !== "object" || typeof detail.chatId !== "string") return;
   const files = Array.isArray(detail.files) ? detail.files.filter((item): item is File => item instanceof File) : [];
   const reference = files.find((file) => file.type.startsWith("image/"));
-  if (reference === undefined) referenceFiles.delete(detail.chatId);
-  else referenceFiles.set(detail.chatId, reference);
+  if (reference !== undefined) {
+    referenceFiles.set(detail.chatId, reference);
+    referencePersistence.set(
+      detail.chatId,
+      persistProductionReferenceFile(detail.chatId, exactBuildCommit(), reference),
+    );
+  }
   const previous = live.get(detail.chatId);
   previous?.renderer.close();
   live.delete(detail.chatId);
@@ -231,14 +262,9 @@ async function prepareForChat(chatId: string): Promise<void> {
   if (preparing.has(chatId)) return;
   const job = productionJobForChat(chatId);
   const camera = cameraExecutionForChat(chatId);
-  const referenceFile = referenceFiles.get(chatId);
   if (job === undefined || camera === undefined) return;
   if (job.stage !== "PERFORMANCE_VALID" || job.blocking === undefined || job.rig === undefined || job.acting === undefined) return;
   if (camera.runtimeStage !== "READY_FOR_RENDER") return;
-  if (referenceFile === undefined) {
-    block(chatId, "Render requires the exact reference File from this live production submission; persisted metadata alone cannot reconstruct source pixels.");
-    return;
-  }
   const sourceCommit = exactBuildCommit();
   if (camera.sourceCommit !== sourceCommit) {
     block(chatId, "Camera execution belongs to a different Studio source commit.");
@@ -247,6 +273,41 @@ async function prepareForChat(chatId: string): Promise<void> {
 
   preparing.add(chatId);
   try {
+    const pendingPersistence = referencePersistence.get(chatId);
+    if (pendingPersistence !== undefined) {
+      try {
+        await pendingPersistence;
+      } catch (error) {
+        block(
+          chatId,
+          error instanceof Error
+            ? `Exact reference byte persistence failed: ${error.message}`
+            : "Exact reference byte persistence failed.",
+        );
+        return;
+      }
+    }
+
+    let referenceFile = referenceFiles.get(chatId);
+    if (referenceFile === undefined) {
+      try {
+        referenceFile = await restoreProductionReferenceFile(chatId, sourceCommit) ?? undefined;
+      } catch (error) {
+        block(
+          chatId,
+          error instanceof Error
+            ? `Exact reference byte restoration failed: ${error.message}`
+            : "Exact reference byte restoration failed.",
+        );
+        return;
+      }
+      if (referenceFile !== undefined) referenceFiles.set(chatId, referenceFile);
+    }
+    if (referenceFile === undefined) {
+      block(chatId, "Render requires the exact reference pixels from this production submission; no verified live or persisted source bytes are available.");
+      return;
+    }
+
     const prepared = await prepareProductionRenderer({
       blocking: job.blocking,
       rig: job.rig,
@@ -326,7 +387,7 @@ export async function exportProductionMp4(chatId: string): Promise<void> {
   if (exporting.has(chatId)) return;
   const execution = live.get(chatId);
   if (execution === undefined || execution.record.artifact === undefined) {
-    block(chatId, "Production MP4 export requires a live exact-source renderer.");
+    patchPanel(chatId);
     return;
   }
   if (execution.record.sourceCommit !== exactBuildCommit()) {

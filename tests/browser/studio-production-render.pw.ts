@@ -58,8 +58,8 @@ async function enableNativeCaptureRuntime(page: Page): Promise<void> {
   await expect(page.locator("html")).toHaveClass(/runtime-simple-ui/);
 }
 
-test("READY_FOR_RENDER produces temporally distinct source-bound frames and a native-verified H.264 Opus MP4", async ({ page }) => {
-  test.setTimeout(90_000);
+test("READY_FOR_RENDER survives a runtime reload, restores exact source bytes and produces a native-verified H.264 Opus MP4", async ({ page }) => {
+  test.setTimeout(100_000);
   await page.goto("/");
   await enableNativeCaptureRuntime(page);
   await page.locator("[data-runtime-file-input]").setInputFiles({
@@ -70,7 +70,7 @@ test("READY_FOR_RENDER produces temporally distinct source-bound frames and a na
   await page.getByLabel("Message", { exact: true }).fill("ACTOR SPEAK Hello 2 seconds 320x240 12 fps");
   await page.getByLabel("Send message").click();
 
-  const status = page.locator("[data-runtime-production-status]");
+  let status = page.locator("[data-runtime-production-status]");
   await expect(status).toHaveAttribute("data-camera-ready", "true");
   await expect(status).toHaveAttribute("data-render-ready", "true");
   await expect(page.locator("[data-runtime-production-stage]")).toContainText("READY_FOR_RENDER");
@@ -89,6 +89,29 @@ test("READY_FOR_RENDER produces temporally distinct source-bound frames and a na
   expect(evidence).toHaveLength(3);
   expect(new Set(evidence.map((item) => item.checksum)).size).toBeGreaterThan(1);
   expect(evidence.every((item) => (item.sourceCoveragePixels ?? 0) > 0)).toBe(true);
+
+  await page.reload();
+  await enableNativeCaptureRuntime(page);
+  status = page.locator("[data-runtime-production-status]");
+  await expect(status).toHaveAttribute("data-camera-ready", "true", { timeout: 15_000 });
+  await expect(status).toHaveAttribute("data-render-ready", "true", { timeout: 15_000 });
+  await expect(page.locator("[data-runtime-production-stage]")).toContainText("READY_FOR_RENDER");
+  await expect(page.locator("[data-runtime-production-step]").nth(6)).toHaveAttribute("data-complete", "true");
+  await expect(page.locator("[data-runtime-production-export]")).toBeEnabled();
+  await expect(page.locator("[data-runtime-production-message]")).toContainText("H.264 + Opus MP4 export is ready");
+  await expect(page.locator("[data-runtime-render-plan]")).toContainText("distinct checksums");
+
+  const renderStateAfterReload = await page.evaluate(() => localStorage.getItem("aistudio.runtime.production-render.v1"));
+  const restored = JSON.parse(renderStateAfterReload ?? "[]") as Array<{
+    sourceCommit?: string;
+    status?: string;
+    diagnostics?: string[];
+    artifact?: { temporalEvidence?: Array<{ checksum?: string; sourceCoveragePixels?: number }> };
+  }>;
+  expect(restored[0]?.sourceCommit).toBe(before[0]?.sourceCommit);
+  expect(restored[0]?.status).toBe("RENDER_READY");
+  expect(restored[0]?.diagnostics?.join(" ")).not.toContain("no verified live or persisted source bytes");
+  expect(restored[0]?.artifact?.temporalEvidence).toHaveLength(3);
 
   await page.locator("[data-runtime-production-export]").click();
   await expect(status).toHaveAttribute("data-mp4-ready", "true", { timeout: 75_000 });
