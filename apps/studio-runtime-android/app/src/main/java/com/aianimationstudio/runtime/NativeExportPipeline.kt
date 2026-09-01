@@ -408,6 +408,7 @@ private object NativeSavedMp4Verifier {
             var inputSamples = 0
             var outputBuffers = 0
             var firstOutputDecoded = false
+            var lastInputPtsUs = -1L
             var lastOutputPtsUs = -1L
             var idleCycles = 0
 
@@ -422,13 +423,17 @@ private object NativeSavedMp4Verifier {
                         buffer.clear()
                         val sampleSize = extractor.readSampleData(buffer, 0)
                         if (sampleSize < 0) {
-                            val eosPtsUs = max(0L, lastOutputPtsUs)
+                            val eosPtsUs = max(0L, lastInputPtsUs)
                             codec.queueInputBuffer(inputIndex, 0, 0, eosPtsUs, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
                             inputEos = true
                         } else {
                             val ptsUs = extractor.sampleTime
                             check(ptsUs >= 0L) { "Native decoder input sample has a negative timestamp." }
+                            check(lastInputPtsUs < 0L || ptsUs >= lastInputPtsUs) {
+                                "Native decoder input sample timestamps are not monotonic."
+                            }
                             codec.queueInputBuffer(inputIndex, 0, sampleSize, ptsUs, 0)
+                            lastInputPtsUs = ptsUs
                             inputSamples += 1
                             extractor.advance()
                         }
