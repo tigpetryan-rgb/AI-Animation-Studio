@@ -57,15 +57,38 @@ class NaturalLanguageSceneCompilerTest {
     }
 
     @Test
+    fun `mixed language applies every present language recognizer and fails closed on unsupported intent`() {
+        val result = compile("Կերպարը հանգիստ սպասում է, then opens the door for 20 seconds.")
+
+        assertEquals(NativeSceneSemanticStatus.VALID_BUT_UNSUPPORTED_CAPABILITY, result.status)
+        val ir = requireNotNull(result.ir)
+        assertEquals(NativeSceneLanguage.MIXED, ir.detectedLanguage)
+        assertTrue(ir.actions.any { it.concept == NativeSceneConcept.WAIT })
+        assertTrue(ir.actions.any { it.concept == NativeSceneConcept.OPEN })
+        assertTrue(result.diagnostics.any { it.code == "UNSUPPORTED_CAPABILITY" && it.message.contains("OPEN") })
+    }
+
+    @Test
     fun `semantically understood interaction fails closed as unsupported capability`() {
         val result = compile("Կերպարը քայլում է դեպի պատուհանը և բացում է այն 24 վայրկյան։")
 
         assertEquals(NativeSceneSemanticStatus.VALID_BUT_UNSUPPORTED_CAPABILITY, result.status)
-        assertNotNull(result.ir)
-        assertTrue(result.ir!!.actions.any { it.concept == NativeSceneConcept.WALK_TO })
-        assertTrue(result.ir!!.actions.any { it.concept == NativeSceneConcept.OPEN })
+        val ir = requireNotNull(result.ir)
+        assertTrue(ir.actions.any { it.concept == NativeSceneConcept.WALK_TO })
+        assertTrue(ir.actions.any { it.concept == NativeSceneConcept.OPEN })
         assertTrue(result.diagnostics.isNotEmpty())
         assertTrue(result.diagnostics.all { it.code == "UNSUPPORTED_CAPABILITY" })
+    }
+
+    @Test
+    fun `camera lighting and environment intent is understood but never fabricated as executable`() {
+        val result = compile("The camera zooms and the lighting dims while the background changes for 20 seconds.")
+
+        assertEquals(NativeSceneSemanticStatus.VALID_BUT_UNSUPPORTED_CAPABILITY, result.status)
+        val concepts = requireNotNull(result.ir).actions.map { it.concept }.toSet()
+        assertTrue(NativeSceneConcept.CAMERA_MOVE in concepts)
+        assertTrue(NativeSceneConcept.LIGHTING_CHANGE in concepts)
+        assertTrue(NativeSceneConcept.ENVIRONMENT_CHANGE in concepts)
     }
 
     @Test
@@ -75,6 +98,22 @@ class NaturalLanguageSceneCompilerTest {
         assertEquals(NativeSceneSemanticStatus.AMBIGUOUS_SEMANTICS, result.status)
         assertEquals(null, result.ir)
         assertTrue(result.diagnostics.any { it.code == "AMBIGUOUS_SEMANTICS" })
+    }
+
+    @Test
+    fun `bounded backend failure category survives compiler boundary`() {
+        val backend = NativeSceneSemanticBackend {
+            throw NativeSceneBackendException(
+                NativeSceneBackendFailureCategory.TIMEOUT,
+                "fixture timeout",
+            )
+        }
+        val result = compile("The character waits for 20 seconds.", backend)
+
+        assertEquals(NativeSceneSemanticStatus.INVALID_SCHEMA, result.status)
+        assertEquals(null, result.ir)
+        assertTrue(result.diagnostics.any { it.code == NativeSceneBackendFailureCategory.TIMEOUT.diagnosticCode })
+        assertFalse(result.diagnostics.any { it.code == "SCENE_BACKEND_FAILURE" })
     }
 
     @Test
