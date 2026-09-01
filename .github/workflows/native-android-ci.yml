@@ -68,7 +68,24 @@ jobs:
             -PruntimeVersion="0.2.0-native-ci+${AISTUDIO_SOURCE_SHA:0:12}" \
             -PruntimeVersionCode="${GITHUB_RUN_NUMBER}" \
             --no-daemon
-          test -s app/build/outputs/apk/debug/app-debug.apk
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+
+          if ! unzip -p "$APK" 'classes*.dex' | grep -a --fixed-strings "$AISTUDIO_SOURCE_SHA" >/dev/null; then
+            echo "Built native APK does not embed the exact workflow source SHA." >&2
+            exit 1
+          fi
+
+          for forbidden in \
+            'Landroid/webkit/WebView;' \
+            'Landroid/webkit/JavascriptInterface;' \
+            'Lcom/aianimationstudio/runtime/StudioRuntimeBridge;'
+          do
+            if unzip -p "$APK" 'classes*.dex' | grep -a --fixed-strings "$forbidden" >/dev/null; then
+              echo "Built native APK contains forbidden browser runtime bytecode reference: $forbidden" >&2
+              exit 1
+            fi
+          done
 
       - name: Upload native Android APK
         uses: actions/upload-artifact@v4
