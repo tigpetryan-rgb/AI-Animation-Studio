@@ -13,6 +13,7 @@ internal data class NativeProductionSnapshot(
     val referenceSha256: String?,
     val blocking: NativeSceneBlocking? = null,
     val rig: NativeCharacterRig? = null,
+    val model3d: NativeCharacterModel3D? = null,
     val story: NativeStoryIr? = null,
     val performance: NativeActingPerformance? = null,
     val camera: NativeCameraExecution? = null,
@@ -22,9 +23,10 @@ internal data class NativeProductionSnapshot(
     val diagnostics: List<NativeDiagnostic> = emptyList(),
 ) {
     val blockingReady: Boolean get() = blocking != null
+    val model3dReady: Boolean get() = model3d != null
     val performanceReady: Boolean get() = performance != null
     val cameraReady: Boolean get() = camera != null && stage == NativeProductionStage.READY_FOR_RENDER
-    val renderReady: Boolean get() = false // becomes true only after the native frame renderer is ported and verified.
+    val renderReady: Boolean get() = false // becomes true only after frame rendering + temporal verification passes.
 }
 
 private object NativeStorySourceProjector {
@@ -42,7 +44,7 @@ private object NativeStorySourceProjector {
     )
 
     fun project(prompt: String): String = prompt
-        .split(Regex("\\r?\\n"))
+        .split(Regex("\\r?\n"))
         .joinToString("\n") { original ->
             val match = waitWithSuffix.matchEntire(original.trim()) ?: return@joinToString original
             if (!containsOnlyOutputMetadata(match.groupValues[2])) return@joinToString original
@@ -202,6 +204,19 @@ internal object NativeProductionCoordinator {
             )
         }
 
+        val modelResult = NativeCharacterModel3DBuilder.build(blocking, rig)
+        val model3d = when (modelResult) {
+            is NativeCharacterModel3DResult.Ready -> modelResult.model
+            is NativeCharacterModel3DResult.Rejected -> return NativeProductionSnapshot(
+                stage = NativeProductionStage.BLOCKING_VALID,
+                sourceCommit = sourceCommit,
+                referenceSha256 = reference?.sha256,
+                blocking = blocking,
+                rig = rig,
+                diagnostics = modelResult.diagnostics,
+            )
+        }
+
         val registry = listOf(
             NativeStoryEntity(
                 id = blocking.actorId,
@@ -217,6 +232,7 @@ internal object NativeProductionCoordinator {
                 referenceSha256 = reference?.sha256,
                 blocking = blocking,
                 rig = rig,
+                model3d = model3d,
                 story = storyResult.ir,
                 diagnostics = storyResult.diagnostics,
             )
@@ -231,6 +247,7 @@ internal object NativeProductionCoordinator {
                 referenceSha256 = reference?.sha256,
                 blocking = blocking,
                 rig = rig,
+                model3d = model3d,
                 story = storyResult.ir,
                 diagnostics = performanceResult.diagnostics,
             )
@@ -245,6 +262,7 @@ internal object NativeProductionCoordinator {
                 referenceSha256 = reference?.sha256,
                 blocking = blocking,
                 rig = rig,
+                model3d = model3d,
                 story = storyResult.ir,
                 performance = performance,
                 diagnostics = cameraResult.diagnostics,
@@ -257,11 +275,16 @@ internal object NativeProductionCoordinator {
             referenceSha256 = reference?.sha256,
             blocking = blocking,
             rig = rig,
+            model3d = model3d,
             story = storyResult.ir,
             performance = performance,
             camera = camera,
             diagnostics = listOf(
-                NativeDiagnostic("PRODUCTION_READY_FOR_RENDER", "Deterministic blocking, skeletal performance and sampled camera visibility are valid on exact source/reference identity. Native frame rendering and H.264 + Opus MP4 export remain separate downstream gates."),
+                NativeDiagnostic(
+                    "MODEL3D_READY",
+                    "Real skinned 3D mesh is source-bound and validated: ${model3d.vertexCount} vertices, ${model3d.triangleCount} triangles, ${model3d.bindJoints.size} bind joints, depth ${"%.3f".format(model3d.depthExtentMeters)} m.",
+                ),
+                NativeDiagnostic("PRODUCTION_READY_FOR_RENDER", "Blocking, real 3D mesh + skin weights, skeletal performance and sampled camera visibility are valid on exact source/reference identity. Native frame rendering and H.264 + Opus MP4 export remain separate downstream gates."),
             ),
         )
     }
