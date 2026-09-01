@@ -71,7 +71,9 @@ kotlin {
 }
 
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2026.08.00")
+    // Keep the M56 native rewrite on the stable Compose generation that supports
+    // the existing Android 16 / compileSdk 36 / AGP 8.13 toolchain.
+    val composeBom = platform("androidx.compose:compose-bom:2026.02.01")
     implementation(composeBom)
     androidTestImplementation(composeBom)
 
