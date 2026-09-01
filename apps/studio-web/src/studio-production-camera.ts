@@ -27,6 +27,7 @@ interface PersistedCameraExecution {
 const executions = new Map<string, PersistedCameraExecution>();
 const cameraRuntimes = new Map<string, ProductionRuntime>();
 let installed = false;
+let productionPanelObserver: MutationObserver | null = null;
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -82,6 +83,16 @@ function cameraStep(panel: HTMLElement): HTMLElement | null {
   return rows.find((row) => row.textContent?.includes("Camera") === true) ?? null;
 }
 
+function panelNeedsPatch(chatId: string, panel: HTMLElement): boolean {
+  const execution = executions.get(chatId);
+  if (execution === undefined) return false;
+  const plan = panel.querySelector<HTMLElement>("[data-runtime-camera-plan]");
+  const row = cameraStep(panel);
+  return panel.dataset.cameraReady !== "true"
+    || plan?.dataset.sourceCommit !== execution.sourceCommit
+    || row?.dataset.complete !== "true";
+}
+
 function patchPanel(chatId: string): boolean {
   const execution = executions.get(chatId);
   if (execution === undefined) return false;
@@ -110,6 +121,20 @@ function patchPanel(chatId: string): boolean {
   plan.dataset.sourceCommit = execution.sourceCommit;
   plan.textContent = `Camera: ${execution.artifact.keyframes.length} keyframes · ${execution.artifact.visibilitySamples.length} frustum samples · exact continuity · ${execution.sourceCommit.slice(0, 12)}`;
   return true;
+}
+
+function rehydrateMountedPanel(): void {
+  const chatId = activeChatId();
+  if (chatId === null || !executions.has(chatId)) return;
+  const panel = document.querySelector<HTMLElement>("[data-runtime-production-status]");
+  if (panel !== null && panelNeedsPatch(chatId, panel)) patchPanel(chatId);
+}
+
+function observeProductionPanel(): void {
+  if (productionPanelObserver !== null || document.body === null) return;
+  productionPanelObserver = new MutationObserver(() => rehydrateMountedPanel());
+  productionPanelObserver.observe(document.body, { childList: true, subtree: true });
+  rehydrateMountedPanel();
 }
 
 function storeExecution(execution: PersistedCameraExecution, runtime: ProductionRuntime): void {
@@ -159,7 +184,7 @@ function syncActive(): void {
   if (chatId === null) return;
   const job = productionJobForChat(chatId);
   if (job !== undefined) executeCamera(job);
-  if (!patchPanel(chatId)) window.setTimeout(() => patchPanel(chatId), 0);
+  patchPanel(chatId);
 }
 
 function onProduction(event: Event): void {
@@ -183,6 +208,8 @@ export function installStudioProductionCamera(): void {
   window.addEventListener("aistudio:runtime-show-chat", syncActive);
   window.addEventListener("aistudio:runtime-ready", syncActive);
   document.addEventListener("click", () => window.setTimeout(syncActive, 0), true);
+  if (document.body === null) document.addEventListener("DOMContentLoaded", observeProductionPanel, { once: true });
+  else observeProductionPanel();
   window.setTimeout(syncActive, 0);
 }
 
