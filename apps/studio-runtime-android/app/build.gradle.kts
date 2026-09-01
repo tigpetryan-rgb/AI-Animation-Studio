@@ -83,6 +83,9 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
 
+    // In-app MP4 muxer supports the production H.264 + Opus MP4 contract.
+    implementation("androidx.media3:media3-muxer:1.11.0")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     testImplementation("junit:junit:4.13.2")
