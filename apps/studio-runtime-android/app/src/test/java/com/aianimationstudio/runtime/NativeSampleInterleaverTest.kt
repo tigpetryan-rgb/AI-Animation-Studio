@@ -25,7 +25,8 @@ class NativeSampleInterleaverTest {
         assertEquals(listOf(NativeEncodedTrack.VIDEO), written.map { it.track })
 
         interleaver.offer(packet(NativeEncodedTrack.AUDIO, 20_000))
-        assertEquals(listOf(0L, 0L), written.map { it.presentationTimeUs })
+        assertEquals(listOf(0L), written.map { it.presentationTimeUs })
+        assertEquals(2, interleaver.pendingPacketCount())
 
         interleaver.offer(packet(NativeEncodedTrack.VIDEO, 41_667))
         assertEquals(listOf(0L, 0L, 20_000L), written.map { it.presentationTimeUs })
