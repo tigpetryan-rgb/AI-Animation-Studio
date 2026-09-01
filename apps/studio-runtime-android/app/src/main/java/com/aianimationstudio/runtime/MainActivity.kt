@@ -12,7 +12,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -84,7 +85,7 @@ private fun NativeStudioApp() {
         try {
             context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         } catch (_: SecurityException) {
-            // The URI remains usable for this activity even when a provider does not grant persistence.
+            // Some document providers do not grant persistence; the URI still works for this session.
         }
         referenceUriText = uri.toString()
     }
@@ -115,10 +116,7 @@ private fun NativeStudioApp() {
                 title = {
                     Column {
                         Text("AI Animation Studio")
-                        Text(
-                            "Native Android · Compose",
-                            style = MaterialTheme.typography.labelSmall,
-                        )
+                        Text("Native Android · Compose", style = MaterialTheme.typography.labelSmall)
                     }
                 },
             )
@@ -204,7 +202,7 @@ private fun StatusCard() {
 }
 
 @Composable
-private fun StudioCard(title: String, content: @Composable Column.() -> Unit) {
+private fun StudioCard(title: String, content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -212,10 +210,11 @@ private fun StudioCard(title: String, content: @Composable Column.() -> Unit) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            content()
-        }
+            content = {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                content()
+            },
+        )
     }
 }
 
@@ -251,7 +250,7 @@ private suspend fun loadReferenceAsset(context: android.content.Context, uri: Ur
     }
 
 private fun formatBytes(bytes: Long): String = when {
-    bytes >= 1_048_576L -> String.format("%.1f MB", bytes / 1_048_576.0)
-    bytes >= 1_024L -> String.format("%.1f KB", bytes / 1_024.0)
+    bytes >= 1_048_576L -> String.format(Locale.ROOT, "%.1f MB", bytes / 1_048_576.0)
+    bytes >= 1_024L -> String.format(Locale.ROOT, "%.1f KB", bytes / 1_024.0)
     else -> "$bytes B"
 }
