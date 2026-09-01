@@ -60,7 +60,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Device-proof artifacts are production-like R8 builds. Dead AndroidX helpers such as
+            // LinkifyCompat.findAddress() must not survive into the browser-free native APK.
+            isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
