@@ -88,6 +88,7 @@ private fun NativeStudioApp() {
         } catch (_: SecurityException) {
             // Persistence of the provider URI is optional because production owns a private byte-for-byte copy.
         }
+        productionSnapshot = null
         pendingImportUri = uri
     }
 
@@ -121,8 +122,8 @@ private fun NativeStudioApp() {
         }
     }
 
-    val intakeReady = reference != null && prompt.isNotBlank() && !restoringReference
-    val exportReady = exportPreflight is NativeExportReadinessResult.Ready
+    val intakeReady = reference != null && prompt.isNotBlank() && !restoringReference && pendingImportUri == null
+    val exportReady = exportPreflight is NativeExportReadinessResult.Ready && pendingImportUri == null && !restoringReference
 
     Scaffold(
         topBar = {
@@ -156,6 +157,7 @@ private fun NativeStudioApp() {
                         productionSnapshot = null
                     },
                     modifier = Modifier.fillMaxWidth(),
+                    enabled = !exportRunning,
                     label = { Text("Project name") },
                     singleLine = true,
                 )
@@ -193,6 +195,7 @@ private fun NativeStudioApp() {
                         productionSnapshot = null
                     },
                     modifier = Modifier.fillMaxWidth(),
+                    enabled = !exportRunning,
                     label = { Text("Deterministic shot script") },
                     minLines = 4,
                 )
@@ -273,15 +276,30 @@ private fun NativeStudioApp() {
 
                 Button(
                     onClick = {
+                        if (exportRunning) return@Button
                         val snapshot = productionSnapshot ?: return@Button
+                        val displayStem = projectName
+                        exportRunning = true
+                        exportResult = null
                         exportScope.launch {
-                            exportRunning = true
-                            exportResult = try {
-                                withContext(Dispatchers.IO) {
+                            try {
+                                val result = withContext(Dispatchers.IO) {
                                     NativeExportPipeline.export(
                                         context = context,
                                         snapshot = snapshot,
-                                        displayStem = projectName,
+                                        displayStem = displayStem,
+                                    )
+                                }
+                                exportResult = if (productionSnapshot == snapshot && projectName == displayStem) {
+                                    result
+                                } else {
+                                    NativeExportPipelineResult.Rejected(
+                                        listOf(
+                                            NativeDiagnostic(
+                                                "EXPORT_UI_IDENTITY_CHANGED",
+                                                "Project or production identity changed while native export was running; the saved file is not admitted as the current MP4_READY result.",
+                                            ),
+                                        ),
                                     )
                                 }
                             } finally {
