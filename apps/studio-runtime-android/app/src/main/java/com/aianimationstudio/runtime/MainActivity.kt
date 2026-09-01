@@ -36,16 +36,20 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.media3.common.util.UnstableApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
+@UnstableApi
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,11 +63,13 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@UnstableApi
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NativeStudioApp() {
     val context = LocalContext.current
     val sourceStore = remember(context) { NativeSourceStore(context) }
+    val exportScope = rememberCoroutineScope()
     var projectName by rememberSaveable { mutableStateOf("Untitled project") }
     var prompt by rememberSaveable { mutableStateOf("") }
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
@@ -71,6 +77,9 @@ private fun NativeStudioApp() {
     var referenceError by remember { mutableStateOf<String?>(null) }
     var restoringReference by remember { mutableStateOf(true) }
     var productionSnapshot by remember { mutableStateOf<NativeProductionSnapshot?>(null) }
+    var exportPreflight by remember { mutableStateOf<NativeExportReadinessResult?>(null) }
+    var exportResult by remember { mutableStateOf<NativeExportPipelineResult?>(null) }
+    var exportRunning by remember { mutableStateOf(false) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -102,7 +111,18 @@ private fun NativeStudioApp() {
             }
     }
 
+    LaunchedEffect(productionSnapshot) {
+        exportResult = null
+        val snapshot = productionSnapshot
+        exportPreflight = if (snapshot == null) {
+            null
+        } else {
+            withContext(Dispatchers.Default) { NativeExportReadiness.check(snapshot) }
+        }
+    }
+
     val intakeReady = reference != null && prompt.isNotBlank() && !restoringReference
+    val exportReady = exportPreflight is NativeExportReadinessResult.Ready
 
     Scaffold(
         topBar = {
@@ -142,7 +162,7 @@ private fun NativeStudioApp() {
             }
 
             StudioCard(title = "Reference image") {
-                Button(onClick = { picker.launch(arrayOf("image/*")) }, enabled = pendingImportUri == null) {
+                Button(onClick = { picker.launch(arrayOf("image/*")) }, enabled = pendingImportUri == null && !exportRunning) {
                     Text(
                         when {
                             pendingImportUri != null -> "Importing exact bytes…"
@@ -177,7 +197,7 @@ private fun NativeStudioApp() {
                     minLines = 4,
                 )
                 Text(
-                    "Current native semantic parser stays fail-closed. Example: ACTOR WAIT or ACTOR SPEAK Hello.",
+                    "Current native semantic parser stays fail-closed. Example: ACTOR WAIT 2 seconds 320x240 12 fps.",
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -196,7 +216,7 @@ private fun NativeStudioApp() {
                             sourceCommit = BuildConfig.STUDIO_COMMIT_SHA,
                         )
                     },
-                    enabled = intakeReady,
+                    enabled = intakeReady && !exportRunning,
                 ) {
                     Text("Prepare native production")
                 }
@@ -206,7 +226,7 @@ private fun NativeStudioApp() {
                     GateLine("Blocking", snapshot.blockingReady)
                     GateLine("Performance", snapshot.performanceReady)
                     GateLine("Camera visibility", snapshot.cameraReady)
-                    GateLine("Render frames", snapshot.renderReady)
+                    GateLine("Render + codecs", exportReady)
                     snapshot.camera?.let {
                         Text(
                             "Camera: ${it.keyframes.size} keyframes · ${it.visibilitySamples.size} temporal frustum samples · exact source continuity",
@@ -222,18 +242,83 @@ private fun NativeStudioApp() {
                     }
                 }
 
+                when (val preflight = exportPreflight) {
+                    null -> {
+                        if (productionSnapshot?.stage == NativeProductionStage.READY_FOR_RENDER) {
+                            Text("Checking exact-source temporal render and native H.264 + Opus codecs…", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    is NativeExportReadinessResult.Rejected -> preflight.diagnostics.forEach { diagnostic ->
+                        Text(
+                            "${diagnostic.code}: ${diagnostic.message}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    is NativeExportReadinessResult.Ready -> {
+                        val artifact = preflight.artifact
+                        Text(
+                            "Render preflight PASS · ${artifact.renderArtifact.temporalEvidence.size} temporal samples · ${artifact.videoEncoderName} + ${artifact.audioEncoderName}",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+
                 Spacer(Modifier.height(4.dp))
                 Text("UI runtime: NATIVE_COMPOSE")
                 Text("WebView runtime: NOT USED")
                 Text("Browser DOM/event state: NOT USED")
                 Text("Source identity: APP_PRIVATE_SHA256 + exact build SHA")
                 Spacer(Modifier.height(4.dp))
-                Text(
-                    "Export remains fail-closed until the native frame renderer, H.264 encoder, Opus encoder, MP4 muxer and saved-file verifier are wired end-to-end.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                Button(onClick = {}, enabled = false) {
-                    Text("Export H.264 + Opus MP4 · native renderer pending")
+
+                Button(
+                    onClick = {
+                        val snapshot = productionSnapshot ?: return@Button
+                        exportScope.launch {
+                            exportRunning = true
+                            exportResult = try {
+                                withContext(Dispatchers.IO) {
+                                    NativeExportPipeline.export(
+                                        context = context,
+                                        snapshot = snapshot,
+                                        displayStem = projectName,
+                                    )
+                                }
+                            } finally {
+                                exportRunning = false
+                            }
+                        }
+                    },
+                    enabled = exportReady && !exportRunning,
+                ) {
+                    Text(if (exportRunning) "Encoding + verifying H.264 + Opus…" else "Export H.264 + Opus MP4")
+                }
+
+                when (val result = exportResult) {
+                    null -> Text(
+                        "MP4_READY requires durable MediaStore save, saved SHA-256, H.264/Opus track inspection, first-frame decode and full-stream native verification.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    is NativeExportPipelineResult.Rejected -> result.diagnostics.forEach { diagnostic ->
+                        Text(
+                            "${diagnostic.code}: ${diagnostic.message}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    is NativeExportPipelineResult.Ready -> {
+                        val artifact = result.artifact
+                        Text("MP4_READY · native save and verification PASS", fontWeight = FontWeight.SemiBold)
+                        Text("${artifact.width} × ${artifact.height} · ${artifact.durationMs} ms · ${formatBytes(artifact.sizeBytes)}")
+                        Text("${artifact.videoMimeType} + ${artifact.audioMimeType} · ${artifact.videoSampleCount} video / ${artifact.audioSampleCount} audio samples")
+                        Text("SHA-256 ${artifact.sha256}")
+                        Text("Saved ${artifact.uri}", style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            "First-frame decode: ${if (artifact.firstVideoFrameDecoded) "PASS" else "FAIL"} · full-stream deterministic decode: ${if (artifact.deterministicPlaybackVerified) "PASS" else "FAIL"}",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text("Source ${artifact.sourceCommit} · reference ${artifact.referenceSha256}", style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
         }
