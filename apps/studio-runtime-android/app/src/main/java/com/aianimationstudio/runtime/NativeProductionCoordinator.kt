@@ -16,6 +16,8 @@ internal data class NativeProductionSnapshot(
     val story: NativeStoryIr? = null,
     val performance: NativeActingPerformance? = null,
     val camera: NativeCameraExecution? = null,
+    val sceneIr: NativeSceneIrV1? = null,
+    val sceneSemanticStatus: NativeSceneSemanticStatus? = null,
     val diagnostics: List<NativeDiagnostic> = emptyList(),
 ) {
     val blockingReady: Boolean get() = blocking != null
@@ -61,6 +63,80 @@ private object NativeStorySourceProjector {
 }
 
 internal object NativeProductionCoordinator {
+    fun prepareNaturalLanguage(
+        chatId: String,
+        prompt: String,
+        reference: PersistedReferenceAsset?,
+        sourceCommit: String,
+        backend: NativeSceneSemanticBackend,
+        shotId: String = "shot-1",
+    ): NativeProductionSnapshot {
+        val preliminaryBlocking = when (val result = NativeSceneBlockingCompiler.compile(chatId, prompt, reference)) {
+            is NativeBlockingResult.Ready -> result.blocking
+            is NativeBlockingResult.Rejected -> return NativeProductionSnapshot(
+                stage = NativeProductionStage.WAITING_VALIDATION,
+                sourceCommit = sourceCommit,
+                referenceSha256 = reference?.sha256,
+                diagnostics = result.diagnostics,
+            )
+        }
+        val exactReference = reference ?: return NativeProductionSnapshot(
+            stage = NativeProductionStage.WAITING_VALIDATION,
+            sourceCommit = sourceCommit,
+            referenceSha256 = null,
+            diagnostics = listOf(NativeDiagnostic("SCENE_REFERENCE_IDENTITY", "Natural-language production requires an exact persisted reference identity.")),
+        )
+        val compilation = NaturalLanguageSceneCompiler(backend).compile(
+            NativeSceneSemanticRequest(
+                originalText = prompt,
+                sourceCommit = sourceCommit,
+                referenceSha256 = exactReference.sha256,
+                actorId = preliminaryBlocking.actorId,
+            ),
+        )
+        if (!compilation.executable) {
+            return NativeProductionSnapshot(
+                stage = NativeProductionStage.BLOCKING_VALID,
+                sourceCommit = sourceCommit,
+                referenceSha256 = exactReference.sha256,
+                blocking = preliminaryBlocking,
+                sceneIr = compilation.ir,
+                sceneSemanticStatus = compilation.status,
+                diagnostics = compilation.diagnostics,
+            )
+        }
+        if (!compilation.matchesIdentity(prompt, exactReference.sha256, sourceCommit)) {
+            return NativeProductionSnapshot(
+                stage = NativeProductionStage.BLOCKING_VALID,
+                sourceCommit = sourceCommit,
+                referenceSha256 = exactReference.sha256,
+                blocking = preliminaryBlocking,
+                sceneIr = compilation.ir,
+                sceneSemanticStatus = NativeSceneSemanticStatus.INVALID_SCHEMA,
+                diagnostics = listOf(NativeDiagnostic("SCENE_IDENTITY_CHANGED", "Compiled Scene IR no longer matches the exact script/reference/build identity.")),
+            )
+        }
+
+        val sceneIr = requireNotNull(compilation.ir)
+        val deterministicScript = NativeSceneIrLowerer.lowerToLegacyDeterministicScript(sceneIr)
+        val production = prepare(
+            chatId = chatId,
+            prompt = deterministicScript,
+            reference = exactReference,
+            sourceCommit = sourceCommit,
+            shotId = shotId,
+        )
+        return production.copy(
+            sceneIr = sceneIr,
+            sceneSemanticStatus = compilation.status,
+            diagnostics = if (production.stage == NativeProductionStage.READY_FOR_RENDER) {
+                compilation.diagnostics + production.diagnostics
+            } else {
+                production.diagnostics
+            },
+        )
+    }
+
     fun prepare(
         chatId: String,
         prompt: String,
