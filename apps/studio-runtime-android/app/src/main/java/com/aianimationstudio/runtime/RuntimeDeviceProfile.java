@@ -1,11 +1,9 @@
 package com.aianimationstudio.runtime;
 
 import android.content.Context;
-import android.content.pm.PackageInfo;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.os.Build;
-import android.webkit.WebView;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -23,6 +21,7 @@ final class RuntimeDeviceProfile {
             "video/hevc",
             "video/av01",
             "video/x-vnd.on2.vp9",
+            "audio/opus",
             "audio/mp4a-latm"
     ));
 
@@ -30,8 +29,13 @@ final class RuntimeDeviceProfile {
 
     static JSONObject create(Context context) throws JSONException {
         JSONObject root = new JSONObject();
-        root.put("schemaVersion", 1);
+        root.put("schemaVersion", 2);
         root.put("platform", "android");
+        root.put("runtimeKind", BuildConfig.STUDIO_RUNTIME_KIND);
+        root.put("nativeComposeUi", true);
+        root.put("webViewUsed", false);
+        root.put("browserDomUsed", false);
+
         root.put("manufacturer", Build.MANUFACTURER);
         root.put("brand", Build.BRAND);
         root.put("model", Build.MODEL);
@@ -59,16 +63,6 @@ final class RuntimeDeviceProfile {
         root.put("runtimePackage", BuildConfig.APPLICATION_ID);
         root.put("runtimeVersion", BuildConfig.VERSION_NAME);
         root.put("runtimeVersionCode", BuildConfig.VERSION_CODE);
-
-        PackageInfo webViewPackage = WebView.getCurrentWebViewPackage();
-        if (webViewPackage != null) {
-            root.put("webViewPackage", webViewPackage.packageName);
-            root.put("webViewVersion", webViewPackage.versionName);
-        } else {
-            root.put("webViewPackage", JSONObject.NULL);
-            root.put("webViewVersion", JSONObject.NULL);
-        }
-
         root.put("mediaCodecs", collectMediaCodecs());
         return root;
     }
