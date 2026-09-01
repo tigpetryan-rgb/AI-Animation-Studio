@@ -361,7 +361,7 @@ internal object NativeSupportedSubsetSemanticProbe : NativeSceneSemanticBackend 
             NativeSceneLanguage.RUSSIAN -> {
                 if (Regex("(?:жд[её]т|ожидает|стоит\\s+спокойно|неподвижно)").containsMatchIn(lower)) add(NativeSceneConcept.WAIT)
                 if (Regex("(?:садится|сидит)").containsMatchIn(lower)) add(NativeSceneConcept.SIT)
-                if (Regex("(?:реагирует|удивля)").containsMatchIn(lower)) add(NativeSceneConcept.REACT)
+                if (Regex("(?:реагирует|удивл)").containsMatchIn(lower)) add(NativeSceneConcept.REACT)
                 if (Regex("(?:говорит|произносит|скажет)").containsMatchIn(lower)) add(NativeSceneConcept.SPEAK, dialogue = quotedDialogue(text))
                 if (Regex("(?:ид[её]т|подходит|шагает)").containsMatchIn(lower)) add(NativeSceneConcept.WALK_TO, target = "semantic-target")
                 if (Regex("(?:бежит|побежит)").containsMatchIn(lower)) add(NativeSceneConcept.RUN_TO, target = "semantic-target")
