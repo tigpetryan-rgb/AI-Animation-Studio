@@ -77,7 +77,22 @@ jobs:
         run: npx playwright install --with-deps chromium firefox webkit
 
       - name: Chromium browser smoke and export stress
-        run: npm run test:browser
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:browser 2>&1 | tee playwright-chromium.log
+
+      - name: Upload Chromium failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chromium-failure-${{ env.AISTUDIO_SOURCE_SHA }}-${{ github.run_attempt }}
+          path: |
+            playwright-chromium.log
+            test-results
+            playwright-report
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Browser compatibility matrix
         run: npm run test:browser:compat
