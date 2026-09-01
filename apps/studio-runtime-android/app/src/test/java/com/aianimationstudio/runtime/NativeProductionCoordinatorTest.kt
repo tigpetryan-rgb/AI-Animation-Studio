@@ -59,6 +59,47 @@ class NativeProductionCoordinatorTest {
     }
 
     @Test
+    fun `armenian natural supported subset reaches ready through scene ir bridge`() {
+        val source = "Կերպարը հանգիստ սպասում է 24 վայրկյան։ Ելքը՝ 320×240, 12 կադր/վրկ։"
+        val snapshot = NativeProductionCoordinator.prepareNaturalLanguage(
+            chatId = "armenian-physical-proof",
+            prompt = source,
+            reference = reference,
+            sourceCommit = sourceCommit,
+            backend = NativeSupportedSubsetSemanticProbe,
+        )
+
+        assertEquals(NativeSceneSemanticStatus.VALID_EXECUTABLE, snapshot.sceneSemanticStatus)
+        assertEquals(NativeSceneLanguage.ARMENIAN, snapshot.sceneIr?.detectedLanguage)
+        assertEquals(NativeProductionStage.READY_FOR_RENDER, snapshot.stage)
+        assertTrue(snapshot.performanceReady)
+        assertTrue(snapshot.cameraReady)
+        assertEquals(NativeStoryAction.WAIT, snapshot.story?.events?.single()?.type)
+        assertEquals(320, snapshot.blocking?.output?.width)
+        assertEquals(240, snapshot.blocking?.output?.height)
+        assertEquals(12.0, snapshot.blocking?.output?.frameRate ?: 0.0, 0.0)
+        assertEquals(24.0, snapshot.blocking?.output?.durationSeconds ?: 0.0, 0.0)
+        assertTrue(snapshot.sceneIr?.scriptSha256?.length == 64)
+    }
+
+    @Test
+    fun `natural understood but unsupported interaction never becomes ready`() {
+        val snapshot = NativeProductionCoordinator.prepareNaturalLanguage(
+            chatId = "unsupported",
+            prompt = "Կերպարը քայլում է դեպի պատուհանը և բացում է այն 24 վայրկյան։",
+            reference = reference,
+            sourceCommit = sourceCommit,
+            backend = NativeSupportedSubsetSemanticProbe,
+        )
+
+        assertEquals(NativeSceneSemanticStatus.VALID_BUT_UNSUPPORTED_CAPABILITY, snapshot.sceneSemanticStatus)
+        assertEquals(NativeProductionStage.BLOCKING_VALID, snapshot.stage)
+        assertFalse(snapshot.performanceReady)
+        assertFalse(snapshot.cameraReady)
+        assertTrue(snapshot.diagnostics.any { it.code == "UNSUPPORTED_CAPABILITY" })
+    }
+
+    @Test
     fun `wait output metadata projection remains fail closed for unknown suffix`() {
         val snapshot = NativeProductionCoordinator.prepare(
             chatId = "main",
@@ -73,7 +114,7 @@ class NativeProductionCoordinatorTest {
     }
 
     @Test
-    fun `natural language remains fail closed instead of fabricating story events`() {
+    fun `natural language remains fail closed instead of fabricating story events in legacy mode`() {
         val snapshot = NativeProductionCoordinator.prepare(
             chatId = "main",
             prompt = "Make the character smile and walk toward the window.",
@@ -84,6 +125,7 @@ class NativeProductionCoordinatorTest {
         assertNotNull(snapshot.blocking)
         assertTrue(snapshot.performance == null)
         assertTrue(snapshot.diagnostics.any { it.code == "STORY_UNKNOWN_ACTOR" })
+        assertEquals(null, snapshot.sceneSemanticStatus)
     }
 
     @Test
