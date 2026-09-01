@@ -204,7 +204,7 @@ internal object NativeProductionCoordinator {
             )
         }
 
-        val modelResult = NativeCharacterModel3DBuilder.build(blocking, rig)
+        val modelResult = NativeReferenceDrivenCharacterModel3DBuilder.build(blocking, rig)
         val model3d = when (modelResult) {
             is NativeCharacterModel3DResult.Ready -> modelResult.model
             is NativeCharacterModel3DResult.Rejected -> return NativeProductionSnapshot(
@@ -282,9 +282,9 @@ internal object NativeProductionCoordinator {
             diagnostics = listOf(
                 NativeDiagnostic(
                     "MODEL3D_READY",
-                    "Real skinned 3D mesh is source-bound and validated: ${model3d.vertexCount} vertices, ${model3d.triangleCount} triangles, ${model3d.bindJoints.size} bind joints, depth ${"%.3f".format(model3d.depthExtentMeters)} m.",
+                    "Reference-driven skinned 3D mesh is source-bound and validated: ${model3d.vertexCount} vertices, ${model3d.triangleCount} triangles, ${model3d.bindJoints.size} bind joints, depth ${"%.3f".format(model3d.depthExtentMeters)} m.",
                 ),
-                NativeDiagnostic("PRODUCTION_READY_FOR_RENDER", "Blocking, real 3D mesh + skin weights, skeletal performance and sampled camera visibility are valid on exact source/reference identity. Native frame rendering and H.264 + Opus MP4 export remain separate downstream gates."),
+                NativeDiagnostic("PRODUCTION_READY_FOR_RENDER", "Blocking, reference-driven 3D mesh + skin weights, skeletal performance and sampled camera visibility are valid on exact source/reference identity. Native frame rendering and H.264 + Opus MP4 export remain separate downstream gates."),
             ),
         )
     }
