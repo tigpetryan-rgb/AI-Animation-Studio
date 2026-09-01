@@ -2,10 +2,6 @@ package com.aianimationstudio.runtime
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.RectF
 import java.io.FileInputStream
 import java.security.MessageDigest
 import java.util.Locale
@@ -16,7 +12,7 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.tan
 
-internal const val NATIVE_PRODUCTION_RENDER_EXECUTOR_KIND = "AISTUDIO_SOURCE_BOUND_2D_CUTOUT_V1"
+internal const val NATIVE_PRODUCTION_RENDER_EXECUTOR_KIND = "AISTUDIO_SKINNED_MESH_3D_V1"
 
 internal data class NativeProductionPoseSample(
     val timeSeconds: Double,
@@ -62,7 +58,7 @@ internal data class NativeProductionRenderArtifact(
     val output: NativeOutputSpec,
     val temporalEvidence: List<NativeProductionFrameEvidence>,
     val executorKind: String = NATIVE_PRODUCTION_RENDER_EXECUTOR_KIND,
-    val renderModel: String = "SOURCE_PIXEL_2D_CUTOUT_CANONICAL_CONTROL",
+    val renderModel: String = "REFERENCE_BOUND_SKINNED_TRIANGLE_MESH_3D",
 )
 
 internal sealed interface NativeRendererPreparation {
@@ -82,27 +78,41 @@ internal object NativeProductionRendererMath {
         val diagnostics = mutableListOf<NativeDiagnostic>()
         val blocking = snapshot.blocking
         val rig = snapshot.rig
+        val model3d = snapshot.model3d
         val performance = snapshot.performance
         val camera = snapshot.camera
         if (!Regex("^[0-9a-f]{40}$").matches(snapshot.sourceCommit)) {
             diagnostics += NativeDiagnostic("RENDER_SOURCE_IDENTITY", "Production renderer requires the exact 40-character Studio source commit.")
         }
-        if (snapshot.stage != NativeProductionStage.READY_FOR_RENDER || blocking == null || rig == null || performance == null || camera == null) {
-            diagnostics += NativeDiagnostic("RENDER_STAGE", "Production renderer requires an admitted READY_FOR_RENDER production snapshot.")
+        if (
+            snapshot.stage != NativeProductionStage.READY_FOR_RENDER ||
+            blocking == null || rig == null || model3d == null || performance == null || camera == null
+        ) {
+            diagnostics += NativeDiagnostic("RENDER_STAGE", "Production renderer requires READY_FOR_RENDER with blocking, rig, real 3D mesh, performance and camera artifacts.")
             return diagnostics
         }
-        if (rig.sourceCommit != snapshot.sourceCommit || performance.sourceCommit != snapshot.sourceCommit || camera.sourceCommit != snapshot.sourceCommit) {
-            diagnostics += NativeDiagnostic("RENDER_SOURCE_CONTINUITY", "Production renderer source identity changed between rig, performance and camera stages.")
+        if (
+            rig.sourceCommit != snapshot.sourceCommit ||
+            model3d.sourceCommit != snapshot.sourceCommit ||
+            performance.sourceCommit != snapshot.sourceCommit ||
+            camera.sourceCommit != snapshot.sourceCommit
+        ) {
+            diagnostics += NativeDiagnostic("RENDER_SOURCE_CONTINUITY", "Production renderer source identity changed between rig, 3D model, performance and camera stages.")
         }
-        if (rig.actorId != blocking.actorId || performance.actorId != blocking.actorId) {
+        if (rig.actorId != blocking.actorId || model3d.actorId != blocking.actorId || performance.actorId != blocking.actorId) {
             diagnostics += NativeDiagnostic("RENDER_ACTOR_CONTINUITY", "Production renderer actor identity changed after scene blocking.")
         }
-        if (rig.shotId != performance.shotId) {
-            diagnostics += NativeDiagnostic("RENDER_SHOT_CONTINUITY", "Production renderer shot identity changed between rig and acting stages.")
+        if (rig.shotId != model3d.shotId || rig.shotId != performance.shotId) {
+            diagnostics += NativeDiagnostic("RENDER_SHOT_CONTINUITY", "Production renderer shot identity changed between rig, 3D model and acting stages.")
         }
-        if (snapshot.referenceSha256 != blocking.reference.sha256 || rig.referenceSha256 != blocking.reference.sha256) {
-            diagnostics += NativeDiagnostic("RENDER_REFERENCE_CONTINUITY", "Production renderer exact reference SHA-256 changed after scene blocking.")
+        if (
+            snapshot.referenceSha256 != blocking.reference.sha256 ||
+            rig.referenceSha256 != blocking.reference.sha256 ||
+            model3d.referenceSha256 != blocking.reference.sha256
+        ) {
+            diagnostics += NativeDiagnostic("RENDER_REFERENCE_CONTINUITY", "Production renderer exact reference SHA-256 changed after 3D model creation.")
         }
+        diagnostics += NativeCharacterModel3DValidator.validate(model3d, rig)
         if (camera.visibilitySamples.isEmpty() || camera.visibilitySamples.any { !it.visible }) {
             diagnostics += NativeDiagnostic("RENDER_CAMERA_VISIBILITY", "Production renderer requires all admitted camera visibility samples to remain visible.")
         }
@@ -146,6 +156,10 @@ internal object NativeProductionRendererMath {
         )
     }
 
+    /**
+     * Retained as a regression-only 2D projection estimator for existing math tests. Production
+     * rendering no longer consumes this geometry; it projects the real skinned triangle mesh.
+     */
     fun frameGeometry(
         blocking: NativeSceneBlocking,
         pose: NativeProductionPoseSample,
@@ -265,6 +279,7 @@ internal object NativeProductionRendererMath {
 internal class NativeAndroidFrameRenderer private constructor(
     private val snapshot: NativeProductionSnapshot,
     private val sourceBitmap: Bitmap,
+    private val palette: NativeReferencePalette3D,
 ) : AutoCloseable {
     val width: Int get() = requireNotNull(snapshot.blocking).output.width
     val height: Int get() = requireNotNull(snapshot.blocking).output.height
@@ -274,36 +289,27 @@ internal class NativeAndroidFrameRenderer private constructor(
         check(!sourceBitmap.isRecycled) { "Production renderer is closed." }
         require(target.width == width && target.height == height) { "Production render target must be ${width}×${height}." }
         require(timeSeconds.isFinite() && timeSeconds in 0.0..durationSeconds) { "Production frame time is outside the admitted shot duration." }
-        val blocking = requireNotNull(snapshot.blocking)
         val performance = requireNotNull(snapshot.performance)
         val cameraExecution = requireNotNull(snapshot.camera)
+        val model = requireNotNull(snapshot.model3d)
         val pose = NativeProductionRendererMath.samplePose(performance, timeSeconds)
         val camera = NativeProductionRendererMath.sampleCamera(cameraExecution, timeSeconds)
-        val geometry = NativeProductionRendererMath.frameGeometry(blocking, pose, camera)
-
-        val canvas = Canvas(target)
-        canvas.drawColor(Color.rgb(10, 12, 16))
-        val groundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(18, 21, 27) }
-        canvas.drawRect(0f, (height * 0.76f), width.toFloat(), height.toFloat(), groundPaint)
-
-        val left = (geometry.centerX - geometry.drawWidth / 2.0).toFloat()
-        val top = (geometry.centerY - geometry.drawHeight / 2.0).toFloat()
-        val destination = RectF(
-            left,
-            top,
-            (left + geometry.drawWidth).toFloat(),
-            (top + geometry.drawHeight).toFloat(),
+        val geometry = NativeSkinnedMeshRenderer3D.render(
+            target = target,
+            model = model,
+            performance = performance,
+            camera = camera,
+            palette = palette,
+            timeSeconds = timeSeconds,
         )
-        val save = canvas.save()
-        canvas.rotate(geometry.rotationDegrees.toFloat(), geometry.centerX.toFloat(), geometry.centerY.toFloat())
-        canvas.drawBitmap(sourceBitmap, null, destination, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
-        canvas.restoreToCount(save)
+        check(geometry.visibleTriangles > 0) { "3D renderer produced no visible triangles at $timeSeconds seconds." }
+        check(geometry.coveragePixels > 0L) { "3D renderer produced no visible mesh coverage at $timeSeconds seconds." }
 
         if (!captureEvidence) return null
         return NativeProductionFrameEvidence(
             timeSeconds = timeSeconds,
             checksum = readbackChecksum(target),
-            sourceCoveragePixels = geometry.sourceCoveragePixels,
+            sourceCoveragePixels = geometry.coveragePixels,
             sourceDrawWidth = geometry.drawWidth,
             sourceDrawHeight = geometry.drawHeight,
             pose = pose,
@@ -317,10 +323,10 @@ internal class NativeAndroidFrameRenderer private constructor(
             val times = listOf(0.0, durationSeconds * 0.5, durationSeconds * 0.82)
             val evidence = times.map { time -> requireNotNull(renderFrame(target, time, captureEvidence = true)) }
             if (evidence.any { it.sourceCoveragePixels <= 0L }) {
-                return NativeTemporalRenderVerification.Rejected(listOf(NativeDiagnostic("RENDER_NO_SOURCE_PIXELS", "Production render evidence contains no source-pixel coverage.")))
+                return NativeTemporalRenderVerification.Rejected(listOf(NativeDiagnostic("RENDER_NO_3D_MESH_PIXELS", "Production render evidence contains no projected 3D mesh coverage.")))
             }
             if (evidence.map { it.checksum }.toSet().size < 2) {
-                return NativeTemporalRenderVerification.Rejected(listOf(NativeDiagnostic("RENDER_TEMPORAL_IDENTITY", "Production render frames are temporally identical; animated-frame gate failed closed.")))
+                return NativeTemporalRenderVerification.Rejected(listOf(NativeDiagnostic("RENDER_TEMPORAL_IDENTITY", "Production 3D render frames are temporally identical; animated-frame gate failed closed.")))
             }
             val blocking = requireNotNull(snapshot.blocking)
             val rig = requireNotNull(snapshot.rig)
@@ -386,7 +392,8 @@ internal class NativeAndroidFrameRenderer private constructor(
                 bitmap.recycle()
                 return NativeRendererPreparation.Rejected(listOf(NativeDiagnostic("RENDER_REFERENCE_DIMENSIONS", "Production renderer decoded dimensions do not match the admitted reference identity.")))
             }
-            return NativeRendererPreparation.Ready(NativeAndroidFrameRenderer(snapshot, bitmap))
+            val palette = NativeReferencePalette3D.fromBitmap(bitmap)
+            return NativeRendererPreparation.Ready(NativeAndroidFrameRenderer(snapshot, bitmap, palette))
         }
 
         private fun sha256(file: java.io.File): String {
