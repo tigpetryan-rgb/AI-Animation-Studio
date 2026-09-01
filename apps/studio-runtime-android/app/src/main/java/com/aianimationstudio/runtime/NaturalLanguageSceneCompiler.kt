@@ -341,7 +341,7 @@ internal object NativeSupportedSubsetSemanticProbe : NativeSceneSemanticBackend 
                 if (Regex("(?:նստ|նստում)").containsMatchIn(lower)) add(NativeSceneConcept.SIT)
                 if (Regex("(?:զարմ|արձագանք)").containsMatchIn(lower)) add(NativeSceneConcept.REACT)
                 if (armenianSpeech.containsMatchIn(lower)) add(NativeSceneConcept.SPEAK, dialogue = quotedDialogue(text))
-                if (Regex("(?:քայլ|մոտեն|գնում\\s+է)").containsMatchIn(lower)) add(NativeSceneConcept.WALK_TO, target = "semantic-target")
+                if (Regex("(?:քայլ|մոտեն)|(?<![\\p{L}\\p{M}])գնում\\s+է(?![\\p{L}\\p{M}])").containsMatchIn(lower)) add(NativeSceneConcept.WALK_TO, target = "semantic-target")
                 if (Regex("(?:վազ|վազում)").containsMatchIn(lower)) add(NativeSceneConcept.RUN_TO, target = "semantic-target")
                 if (Regex("(?:վերցն|վերցնում)").containsMatchIn(lower)) add(NativeSceneConcept.PICK_UP, target = "semantic-target")
                 if (Regex("(?:բաց|բացում)").containsMatchIn(lower)) add(NativeSceneConcept.OPEN, target = "semantic-target")
