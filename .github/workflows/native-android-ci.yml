@@ -2,7 +2,7 @@ name: Native Android CI
 
 on:
   push:
-    branches: ["m56/**", "m57/**"]
+    branches: ["m56/**", "m57/**", "m58/**"]
   pull_request:
     branches: [main]
     paths:
@@ -79,7 +79,19 @@ jobs:
             --tests "com.aianimationstudio.runtime.M57MultilingualSemanticBenchmarkTest" \
             -PstudioCommitSha="${AISTUDIO_SOURCE_SHA}" \
             -PstudioSourceDate="${AISTUDIO_SOURCE_DATE}" \
-            -PruntimeVersion="0.3.0-m57-ci+${AISTUDIO_SOURCE_SHA:0:12}" \
+            -PruntimeVersion="0.4.0-m58-ci+${AISTUDIO_SOURCE_SHA:0:12}" \
+            -PruntimeVersionCode="${GITHUB_RUN_NUMBER}" \
+            --no-daemon
+
+      - name: M58 real 3D mesh and skinning gate
+        working-directory: apps/studio-runtime-android
+        run: |
+          ./gradlew \
+            :app:testReleaseUnitTest \
+            --tests "com.aianimationstudio.runtime.NativeCharacterModel3DTest" \
+            -PstudioCommitSha="${AISTUDIO_SOURCE_SHA}" \
+            -PstudioSourceDate="${AISTUDIO_SOURCE_DATE}" \
+            -PruntimeVersion="0.4.0-m58-ci+${AISTUDIO_SOURCE_SHA:0:12}" \
             -PruntimeVersionCode="${GITHUB_RUN_NUMBER}" \
             --no-daemon
 
@@ -87,7 +99,7 @@ jobs:
         working-directory: apps/studio-runtime-android
         run: |
           set -euo pipefail
-          RUNTIME_VERSION="0.3.0-m57-ci+${AISTUDIO_SOURCE_SHA:0:12}"
+          RUNTIME_VERSION="0.4.0-m58-ci+${AISTUDIO_SOURCE_SHA:0:12}"
           ./gradlew \
             :app:testReleaseUnitTest \
             :app:lintRelease \
@@ -167,7 +179,7 @@ jobs:
           fi
           echo "Provider-secret APK checkpoint PASS."
 
-      - name: Compute M57 APK SHA-256
+      - name: Compute M58 APK SHA-256
         working-directory: apps/studio-runtime-android
         shell: bash
         run: |
@@ -178,16 +190,16 @@ jobs:
             echo "APK SHA-256 extraction did not return a canonical 64-character lowercase digest." >&2
             exit 1
           fi
-          echo "M57_APK_SHA256=$APK_SHA256" >> "$GITHUB_ENV"
+          echo "M58_APK_SHA256=$APK_SHA256" >> "$GITHUB_ENV"
           echo "APK SHA-256 checkpoint PASS: $APK_SHA256"
 
-      - name: Capture M57 APK signer certificate metadata
+      - name: Capture M58 APK signer certificate metadata
         working-directory: apps/studio-runtime-android
         shell: bash
         run: |
           set -euo pipefail
           APK="app/build/outputs/apk/release/app-release.apk"
-          CERTS_FILE="app/build/outputs/apk/release/M57_SIGNER_CERTS.txt"
+          CERTS_FILE="app/build/outputs/apk/release/M58_SIGNER_CERTS.txt"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
           if [[ -z "$APKSIGNER" ]]; then
             echo "Android SDK apksigner was not found while extracting signer provenance." >&2
@@ -200,14 +212,14 @@ jobs:
           fi
           echo "Signer certificate metadata capture checkpoint PASS."
 
-      - name: Extract M57 signer certificate SHA-256
+      - name: Extract M58 signer certificate SHA-256
         working-directory: apps/studio-runtime-android
         shell: bash
         run: |
           set -euo pipefail
-          CERTS_FILE="app/build/outputs/apk/release/M57_SIGNER_CERTS.txt"
-          DIGESTS_FILE="app/build/outputs/apk/release/M57_SIGNER_SHA256.txt"
-          UNRECOGNIZED_FILE="app/build/outputs/apk/release/M57_SIGNER_UNRECOGNIZED.txt"
+          CERTS_FILE="app/build/outputs/apk/release/M58_SIGNER_CERTS.txt"
+          DIGESTS_FILE="app/build/outputs/apk/release/M58_SIGNER_SHA256.txt"
+          UNRECOGNIZED_FILE="app/build/outputs/apk/release/M58_SIGNER_UNRECOGNIZED.txt"
 
           grep -E 'certificate SHA-256 digest:' "$CERTS_FILE" | \
             grep -Ev '^(V[0-9]+ Signer:|Signer #[0-9]+) certificate SHA-256 digest: [0-9A-Fa-f]{64}$' \
@@ -242,16 +254,16 @@ jobs:
             echo "Signer certificate SHA-256 extraction did not return a canonical lowercase 64-character digest." >&2
             exit 1
           fi
-          echo "M57_SIGNER_SHA256=$SIGNER_SHA256" >> "$GITHUB_ENV"
+          echo "M58_SIGNER_SHA256=$SIGNER_SHA256" >> "$GITHUB_ENV"
           echo "Signer certificate SHA-256 checkpoint PASS: $SIGNER_SHA256"
 
-      - name: Write M57 APK provenance manifest
+      - name: Write M58 APK provenance manifest
         working-directory: apps/studio-runtime-android
         shell: bash
         run: |
           set -euo pipefail
-          PROVENANCE="app/build/outputs/apk/release/M57_PROVENANCE.txt"
-          RUNTIME_VERSION="0.3.0-m57-ci+${AISTUDIO_SOURCE_SHA:0:12}"
+          PROVENANCE="app/build/outputs/apk/release/M58_PROVENANCE.txt"
+          RUNTIME_VERSION="0.4.0-m58-ci+${AISTUDIO_SOURCE_SHA:0:12}"
           cat > "$PROVENANCE" <<EOF
           schema_version=1
           repository=${GITHUB_REPOSITORY}
@@ -264,39 +276,40 @@ jobs:
           workflow_run_attempt=${GITHUB_RUN_ATTEMPT}
           runtime_kind=NATIVE_ANDROID_COMPOSE
           runtime_version=${RUNTIME_VERSION}
+          render_executor=${NATIVE_PRODUCTION_RENDER_EXECUTOR_KIND:-AISTUDIO_SKINNED_MESH_3D_V1}
           apk_filename=app-release.apk
-          apk_sha256=${M57_APK_SHA256}
-          signer_certificate_sha256=${M57_SIGNER_SHA256}
+          apk_sha256=${M58_APK_SHA256}
+          signer_certificate_sha256=${M58_SIGNER_SHA256}
           EOF
           test -s "$PROVENANCE"
-          echo "M57 provenance manifest write checkpoint PASS."
+          echo "M58 provenance manifest write checkpoint PASS."
 
-      - name: Verify M57 provenance source SHA
+      - name: Verify M58 provenance source SHA
         working-directory: apps/studio-runtime-android
         shell: bash
         run: |
           set -euo pipefail
-          PROVENANCE="app/build/outputs/apk/release/M57_PROVENANCE.txt"
+          PROVENANCE="app/build/outputs/apk/release/M58_PROVENANCE.txt"
           grep -Fx "source_sha=${AISTUDIO_SOURCE_SHA}" "$PROVENANCE"
-          echo "M57 provenance source SHA checkpoint PASS."
+          echo "M58 provenance source SHA checkpoint PASS."
 
-      - name: Verify M57 provenance APK SHA-256
+      - name: Verify M58 provenance APK SHA-256
         working-directory: apps/studio-runtime-android
         shell: bash
         run: |
           set -euo pipefail
-          PROVENANCE="app/build/outputs/apk/release/M57_PROVENANCE.txt"
-          grep -Fx "apk_sha256=${M57_APK_SHA256}" "$PROVENANCE"
-          echo "M57 provenance APK SHA-256 checkpoint PASS."
+          PROVENANCE="app/build/outputs/apk/release/M58_PROVENANCE.txt"
+          grep -Fx "apk_sha256=${M58_APK_SHA256}" "$PROVENANCE"
+          echo "M58 provenance APK SHA-256 checkpoint PASS."
 
-      - name: Verify M57 provenance signer SHA-256
+      - name: Verify M58 provenance signer SHA-256
         working-directory: apps/studio-runtime-android
         shell: bash
         run: |
           set -euo pipefail
-          PROVENANCE="app/build/outputs/apk/release/M57_PROVENANCE.txt"
-          grep -Fx "signer_certificate_sha256=${M57_SIGNER_SHA256}" "$PROVENANCE"
-          echo "M57 provenance signer SHA-256 checkpoint PASS."
+          PROVENANCE="app/build/outputs/apk/release/M58_PROVENANCE.txt"
+          grep -Fx "signer_certificate_sha256=${M58_SIGNER_SHA256}" "$PROVENANCE"
+          echo "M58 provenance signer SHA-256 checkpoint PASS."
 
       - name: Upload native Android APK
         uses: actions/upload-artifact@v4
@@ -304,6 +317,6 @@ jobs:
           name: studio-native-android-${{ env.AISTUDIO_SOURCE_SHA }}
           path: |
             apps/studio-runtime-android/app/build/outputs/apk/release/app-release.apk
-            apps/studio-runtime-android/app/build/outputs/apk/release/M57_PROVENANCE.txt
+            apps/studio-runtime-android/app/build/outputs/apk/release/M58_PROVENANCE.txt
           if-no-files-found: error
           retention-days: 14
