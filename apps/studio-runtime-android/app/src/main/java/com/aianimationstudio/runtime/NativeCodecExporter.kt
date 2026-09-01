@@ -81,7 +81,7 @@ private data class NativeDrainResult(
     val progressed: Boolean = false,
 )
 
-@OptIn(UnstableApi::class)
+@UnstableApi
 internal object NativeMediaCodecExporter {
     private const val OUTPUT_DEQUEUE_TIMEOUT_US = 10_000L
     private const val MAX_IDLE_DRAIN_CYCLES = 1_000
@@ -209,9 +209,10 @@ internal object NativeMediaCodecExporter {
             created.addAudioTrack(audioFormat)
             check(created.hasBothProductionTracks()) { "Native MP4 muxer did not register both production tracks." }
             muxer = created
-            interleaver = NativeSampleInterleaver(::writePacket)
+            val sink = NativeSampleInterleaver(::writePacket)
+            interleaver = sink
             while (preMuxPackets.isNotEmpty()) {
-                interleaver!!.offer(preMuxPackets.removeFirst())
+                sink.offer(preMuxPackets.removeFirst())
             }
             publishTrackEnd(NativeEncodedTrack.VIDEO, videoDrain)
             publishTrackEnd(NativeEncodedTrack.AUDIO, audioDrain)
