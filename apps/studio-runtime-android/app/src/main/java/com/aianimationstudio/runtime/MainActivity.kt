@@ -70,6 +70,7 @@ private fun NativeStudioApp() {
     var reference by remember { mutableStateOf<PersistedReferenceAsset?>(null) }
     var referenceError by remember { mutableStateOf<String?>(null) }
     var restoringReference by remember { mutableStateOf(true) }
+    var productionSnapshot by remember { mutableStateOf<NativeProductionSnapshot?>(null) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -92,6 +93,7 @@ private fun NativeStudioApp() {
         runCatching { withContext(Dispatchers.IO) { sourceStore.importFrom(uri) } }
             .onSuccess {
                 reference = it
+                productionSnapshot = null
                 pendingImportUri = null
             }
             .onFailure {
@@ -129,7 +131,10 @@ private fun NativeStudioApp() {
             StudioCard(title = "Project") {
                 OutlinedTextField(
                     value = projectName,
-                    onValueChange = { projectName = it },
+                    onValueChange = {
+                        projectName = it
+                        productionSnapshot = null
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("Project name") },
                     singleLine = true,
@@ -146,9 +151,7 @@ private fun NativeStudioApp() {
                         },
                     )
                 }
-                if (restoringReference) {
-                    Text("Verifying persisted source bytes…")
-                }
+                if (restoringReference) Text("Verifying persisted source bytes…")
                 reference?.let { asset ->
                     Text(asset.displayName, fontWeight = FontWeight.SemiBold)
                     Text("${asset.mimeType} · ${formatBytes(asset.sizeBytes)}")
@@ -162,36 +165,84 @@ private fun NativeStudioApp() {
                 referenceError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
 
-            StudioCard(title = "Animation prompt") {
+            StudioCard(title = "Animation script") {
                 OutlinedTextField(
                     value = prompt,
-                    onValueChange = { prompt = it },
+                    onValueChange = {
+                        prompt = it
+                        productionSnapshot = null
+                    },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Describe the shot") },
+                    label = { Text("Deterministic shot script") },
                     minLines = 4,
+                )
+                Text(
+                    "Current native semantic parser stays fail-closed. Example: ACTOR WAIT or ACTOR SPEAK Hello.",
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
 
             StudioCard(title = "Production") {
                 Text(
-                    if (intakeReady) "Native intake: READY" else "Native intake: waiting for verified reference + prompt",
+                    if (intakeReady) "Native intake: READY" else "Native intake: waiting for verified reference + script",
                     fontWeight = FontWeight.SemiBold,
                 )
+                Button(
+                    onClick = {
+                        productionSnapshot = NativeProductionCoordinator.prepare(
+                            chatId = projectName,
+                            prompt = prompt,
+                            reference = reference,
+                            sourceCommit = BuildConfig.STUDIO_COMMIT_SHA,
+                        )
+                    },
+                    enabled = intakeReady,
+                ) {
+                    Text("Prepare native production")
+                }
+
+                productionSnapshot?.let { snapshot ->
+                    Text("Stage: ${snapshot.stage}", fontWeight = FontWeight.SemiBold)
+                    GateLine("Blocking", snapshot.blockingReady)
+                    GateLine("Performance", snapshot.performanceReady)
+                    GateLine("Camera visibility", snapshot.cameraReady)
+                    GateLine("Render frames", snapshot.renderReady)
+                    snapshot.camera?.let {
+                        Text(
+                            "Camera: ${it.keyframes.size} keyframes · ${it.visibilitySamples.size} temporal frustum samples · exact source continuity",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    snapshot.diagnostics.forEach { item ->
+                        Text(
+                            "${item.code}: ${item.message}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (snapshot.stage == NativeProductionStage.READY_FOR_RENDER) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(4.dp))
                 Text("UI runtime: NATIVE_COMPOSE")
                 Text("WebView runtime: NOT USED")
                 Text("Browser DOM/event state: NOT USED")
-                Text("Source identity: APP_PRIVATE_SHA256")
+                Text("Source identity: APP_PRIVATE_SHA256 + exact build SHA")
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Native render/export port is not enabled yet. Export stays blocked until the source-bound renderer and native MP4 verification contract are wired end-to-end.",
+                    "Export remains fail-closed until the native frame renderer, H.264 encoder, Opus encoder, MP4 muxer and saved-file verifier are wired end-to-end.",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Button(onClick = {}, enabled = false) {
-                    Text("Export MP4 · native engine pending")
+                    Text("Export H.264 + Opus MP4 · native renderer pending")
                 }
             }
         }
     }
+}
+
+@Composable
+private fun GateLine(label: String, passed: Boolean) {
+    Text("${if (passed) "✓" else "○"} $label: ${if (passed) "PASS" else "PENDING"}")
 }
 
 @Composable
