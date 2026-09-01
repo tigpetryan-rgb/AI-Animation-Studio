@@ -39,12 +39,16 @@ jobs:
 
       - name: Verify native-only runtime boundary
         run: |
-          if grep -R --line-number --fixed-strings "android.webkit.WebView" apps/studio-runtime-android/app/src/main; then
-            echo "WebView reference found in native runtime source." >&2
+          if grep -R --line-number --fixed-strings "android.webkit." apps/studio-runtime-android/app/src/main; then
+            echo "android.webkit browser bridge/reference found in native runtime source." >&2
             exit 1
           fi
           if grep -R --line-number --fixed-strings "androidx.webkit" apps/studio-runtime-android/app/src/main apps/studio-runtime-android/app/build.gradle.kts; then
             echo "androidx.webkit reference found in native runtime." >&2
+            exit 1
+          fi
+          if grep -R --line-number --fixed-strings "StudioRuntimeBridge" apps/studio-runtime-android/app/src/main; then
+            echo "Legacy StudioRuntimeBridge found in native runtime source." >&2
             exit 1
           fi
           if grep -n --fixed-strings "build:web" apps/studio-runtime-android/app/build.gradle.kts; then
