@@ -68,6 +68,7 @@ const persisted = new Map<string, PersistedProductionRender>();
 const preparing = new Set<string>();
 const exporting = new Set<string>();
 let installed = false;
+let productionPanelObserver: MutationObserver | null = null;
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -118,6 +119,20 @@ function persistRecords(): void {
 function productionRow(panel: HTMLElement, label: "Render" | "MP4 export"): HTMLElement | null {
   const rows = [...panel.querySelectorAll<HTMLElement>("[data-runtime-production-step]")];
   return rows.find((row) => row.textContent?.includes(label) === true) ?? null;
+}
+
+function panelNeedsPatch(chatId: string, panel: HTMLElement): boolean {
+  const liveExecution = live.get(chatId);
+  const state = liveExecution?.record ?? persisted.get(chatId);
+  if (state === undefined) return false;
+  const liveRendererReady = liveExecution !== undefined;
+  const expectedRenderReady = String(liveRendererReady && (state.status === "RENDER_READY" || state.status === "EXPORTING" || state.status === "MP4_READY"));
+  const plan = panel.querySelector<HTMLElement>("[data-runtime-render-plan]");
+  const renderRow = productionRow(panel, "Render");
+  return panel.dataset.renderReady !== expectedRenderReady
+    || panel.dataset.renderSourceCommit !== state.sourceCommit
+    || (state.artifact !== undefined && plan?.dataset.sourceCommit !== state.sourceCommit)
+    || (liveRendererReady && state.status !== "BLOCKED" && renderRow?.dataset.complete !== "true");
 }
 
 function markRow(panel: HTMLElement, label: "Render" | "MP4 export", complete: boolean, state: string): void {
@@ -345,6 +360,23 @@ async function prepareForChat(chatId: string): Promise<void> {
   }
 }
 
+function rehydrateMountedPanel(): void {
+  const chatId = activeChatId();
+  if (chatId === null) return;
+  const state = live.get(chatId)?.record ?? persisted.get(chatId);
+  if (state === undefined) return;
+  const panel = document.querySelector<HTMLElement>("[data-runtime-production-status]");
+  if (panel !== null && panelNeedsPatch(chatId, panel)) patchPanel(chatId);
+  if (live.get(chatId) === undefined) void prepareForChat(chatId);
+}
+
+function observeProductionPanel(): void {
+  if (productionPanelObserver !== null || document.body === null) return;
+  productionPanelObserver = new MutationObserver(() => rehydrateMountedPanel());
+  productionPanelObserver.observe(document.body, { childList: true, subtree: true });
+  rehydrateMountedPanel();
+}
+
 function safeStem(value: string): string {
   const stem = value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
   return stem.length > 0 ? stem.slice(0, 80) : "production";
@@ -523,6 +555,8 @@ export function installStudioProductionRender(): void {
   window.addEventListener("aistudio:runtime-show-chat", syncActive);
   window.addEventListener("aistudio:runtime-ready", syncActive);
   document.addEventListener("click", () => window.setTimeout(syncActive, 0), true);
+  if (document.body === null) document.addEventListener("DOMContentLoaded", observeProductionPanel, { once: true });
+  else observeProductionPanel();
   window.setTimeout(syncActive, 0);
 }
 
