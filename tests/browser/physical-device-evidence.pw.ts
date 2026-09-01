@@ -20,7 +20,7 @@ test("physical-device evidence rejects WebDriver automation", async ({ page }) =
   await page.locator("[data-physical-generate-report]").click();
 
   await expect(page.locator("[data-physical-result]")).toContainText(
-    "Automated/WebDriver sessions are rejected as physical-device evidence.",
+    "WebDriver detected: this session cannot generate physical-device evidence.",
   );
   expect(await download).toBe(false);
 });

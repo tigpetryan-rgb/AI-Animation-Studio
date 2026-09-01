@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#111318" />
     <meta name="description" content="AI Animation Studio — local-first browser movie production system" />
     <link rel="manifest" href="./manifest.webmanifest" />
@@ -13,8 +13,18 @@
     <div id="app"></div>
     <noscript>AI Animation Studio requires JavaScript.</noscript>
     <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/studio-runtime-bridge.ts"></script>
+    <script type="module" src="/src/studio-runtime-evidence-ui.ts"></script>
     <script type="module" src="/src/studio-export.ts"></script>
+    <script type="module" src="/src/studio-runtime-project-save.ts"></script>
     <script type="module" src="/src/studio-timeline-editor-v2.ts"></script>
     <script type="module" src="/src/physical-device-evidence-ui.ts"></script>
+    <script type="module" src="/src/studio-runtime-simple-ui.ts"></script>
+    <script type="module" src="/src/studio-production-intake-v2.ts"></script>
+    <script type="module" src="/src/studio-production-camera.ts"></script>
+    <script type="module" src="/src/studio-production-render.ts"></script>
+    <script type="module" src="/src/studio-runtime-simple-polish.ts"></script>
+    <script type="module" src="/src/studio-runtime-mobile-ux.ts"></script>
+    <script type="module" src="/src/studio-runtime-keyboard-viewport.ts"></script>
   </body>
 </html>
