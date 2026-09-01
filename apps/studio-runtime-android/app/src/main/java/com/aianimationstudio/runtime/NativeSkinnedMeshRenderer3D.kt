@@ -22,17 +22,108 @@ internal data class NativeMeshFrameGeometry3D(
     val farthestDepth: Double,
 )
 
+private data class NativeModelBounds3D(
+    val minX: Double,
+    val maxX: Double,
+    val minY: Double,
+    val maxY: Double,
+    val minZ: Double,
+    val maxZ: Double,
+) {
+    companion object {
+        fun from(model: NativeCharacterModel3D): NativeModelBounds3D {
+            val points = model.vertices.map { it.bindPosition }
+            require(points.isNotEmpty()) { "3D model has no vertices." }
+            return NativeModelBounds3D(
+                minX = points.minOf { it.x },
+                maxX = points.maxOf { it.x },
+                minY = points.minOf { it.y },
+                maxY = points.maxOf { it.y },
+                minZ = points.minOf { it.z },
+                maxZ = points.maxOf { it.z },
+            )
+        }
+    }
+}
+
 internal data class NativeReferencePalette3D(
     val body: Int,
     val face: Int,
     val eye: Int,
     val accent: Int,
+    private val textureBitmap: Bitmap,
+    private val textureViews: List<NativeReferenceViewEvidence3D>,
+    private val backgroundColor: Int,
 ) {
     fun color(material: NativeMaterialSlot3D): Int = when (material) {
         NativeMaterialSlot3D.BODY -> body
         NativeMaterialSlot3D.FACE -> face
         NativeMaterialSlot3D.EYE -> eye
         NativeMaterialSlot3D.ACCENT -> accent
+    }
+
+    fun texturedColor(
+        material: NativeMaterialSlot3D,
+        bindPosition: NativeStagePoint,
+        bindNormal: NativeStagePoint,
+        bounds: NativeModelBounds3D,
+    ): Int {
+        val fallback = color(material)
+        if (textureViews.isEmpty() || textureBitmap.isRecycled) return fallback
+
+        val absX = abs(bindNormal.x)
+        val absZ = abs(bindNormal.z)
+        val viewIndex = when {
+            absZ >= absX && bindNormal.z < -0.15 && textureViews.size >= 3 -> 2 // back
+            absX > absZ && textureViews.size >= 2 -> 1 // side
+            else -> 0 // front
+        }.coerceIn(0, textureViews.lastIndex)
+        val view = textureViews[viewIndex]
+
+        val u = when (viewIndex) {
+            1 -> {
+                val depth = normalizeAxis(bindPosition.z, bounds.minZ, bounds.maxZ)
+                if (bindNormal.x < 0.0) 1.0 - depth else depth
+            }
+            2 -> 1.0 - normalizeAxis(bindPosition.x, bounds.minX, bounds.maxX)
+            else -> normalizeAxis(bindPosition.x, bounds.minX, bounds.maxX)
+        }.coerceIn(0.0, 1.0)
+        val v = (1.0 - normalizeAxis(bindPosition.y, bounds.minY, bounds.maxY)).coerceIn(0.0, 1.0)
+
+        val xFraction = view.leftFraction + u * view.widthFraction
+        val yFraction = view.topFraction + v * view.heightFraction
+        val x = (xFraction * textureBitmap.width).roundToInt().coerceIn(0, textureBitmap.width - 1)
+        val y = (yFraction * textureBitmap.height).roundToInt().coerceIn(0, textureBitmap.height - 1)
+        val sampled = sampleNeighborhood(textureBitmap, x, y)
+
+        // Do not paint sheet background onto the mesh when a coarse silhouette projection lands
+        // just outside the character. Material fallback remains source-derived and deterministic.
+        if (colorDistance(sampled, backgroundColor) < 42.0) return fallback
+        return blend(fallback, sampled, if (material == NativeMaterialSlot3D.BODY) 0.84 else 0.92)
+    }
+
+    private fun normalizeAxis(value: Double, minValue: Double, maxValue: Double): Double {
+        val span = maxValue - minValue
+        return if (!span.isFinite() || span <= 1e-9) 0.5 else (value - minValue) / span
+    }
+
+    private fun sampleNeighborhood(bitmap: Bitmap, centerX: Int, centerY: Int): Int {
+        var r = 0L
+        var g = 0L
+        var b = 0L
+        var count = 0
+        for (dy in -1..1) {
+            for (dx in -1..1) {
+                val x = (centerX + dx).coerceIn(0, bitmap.width - 1)
+                val y = (centerY + dy).coerceIn(0, bitmap.height - 1)
+                val pixel = bitmap.getPixel(x, y)
+                r += Color.red(pixel)
+                g += Color.green(pixel)
+                b += Color.blue(pixel)
+                count += 1
+            }
+        }
+        return Color.rgb((r / count).toInt(), (g / count).toInt(), (b / count).toInt())
     }
 
     internal companion object {
@@ -78,14 +169,38 @@ internal data class NativeReferencePalette3D(
             val body = dominant { _, _, _, saturation, luminance ->
                 saturation >= 0.28 && luminance in 0.18..0.88
             } ?: Color.rgb(69, 183, 181)
-            val face = dominant { r, g, b, saturation, luminance ->
+            val face = dominant { r, _, b, saturation, luminance ->
                 luminance >= 0.62 && saturation <= 0.38 && r >= b
             } ?: blend(body, Color.WHITE, 0.68)
             val eye = dominant { _, _, _, _, luminance -> luminance <= 0.16 } ?: Color.rgb(12, 25, 27)
             val accent = dominant { r, g, b, saturation, luminance ->
                 saturation >= 0.45 && luminance >= 0.45 && r >= b && g >= b
             } ?: Color.rgb(236, 184, 50)
-            return NativeReferencePalette3D(body, face, eye, accent)
+            val views = runCatching { NativeReferenceShapeAnalyzer3D.analyzeBitmap(bitmap)?.viewEvidence.orEmpty() }
+                .getOrDefault(emptyList())
+            return NativeReferencePalette3D(
+                body = body,
+                face = face,
+                eye = eye,
+                accent = accent,
+                textureBitmap = bitmap,
+                textureViews = views,
+                backgroundColor = averageCorners(bitmap),
+            )
+        }
+
+        private fun averageCorners(bitmap: Bitmap): Int {
+            val points = listOf(
+                0 to 0,
+                (bitmap.width - 1) to 0,
+                0 to (bitmap.height - 1),
+                (bitmap.width - 1) to (bitmap.height - 1),
+            )
+            return Color.rgb(
+                points.sumOf { (x, y) -> Color.red(bitmap.getPixel(x, y)) } / points.size,
+                points.sumOf { (x, y) -> Color.green(bitmap.getPixel(x, y)) } / points.size,
+                points.sumOf { (x, y) -> Color.blue(bitmap.getPixel(x, y)) } / points.size,
+            )
         }
 
         private fun blend(left: Int, right: Int, amount: Double): Int {
@@ -96,6 +211,13 @@ internal data class NativeReferencePalette3D(
                 channel(Color.blue(left), Color.blue(right)),
             )
         }
+
+        private fun colorDistance(left: Int, right: Int): Double {
+            val dr = Color.red(left) - Color.red(right)
+            val dg = Color.green(left) - Color.green(right)
+            val db = Color.blue(left) - Color.blue(right)
+            return sqrt((dr * dr + dg * dg + db * db).toDouble())
+        }
     }
 }
 
@@ -103,6 +225,8 @@ internal object NativeSkinnedMeshRenderer3D {
     private data class SkinnedVertex(
         val world: NativeStagePoint,
         val normal: NativeStagePoint,
+        val bindPosition: NativeStagePoint,
+        val bindNormal: NativeStagePoint,
         val material: NativeMaterialSlot3D,
     )
 
@@ -111,6 +235,9 @@ internal object NativeSkinnedMeshRenderer3D {
         val y: Double,
         val depth: Double,
         val world: NativeStagePoint,
+        val normal: NativeStagePoint,
+        val bindPosition: NativeStagePoint,
+        val bindNormal: NativeStagePoint,
         val material: NativeMaterialSlot3D,
     )
 
@@ -121,6 +248,7 @@ internal object NativeSkinnedMeshRenderer3D {
         val averageDepth: Double,
         val material: NativeMaterialSlot3D,
         val shade: Double,
+        val textureColor: Int,
     )
 
     fun render(
@@ -134,19 +262,31 @@ internal object NativeSkinnedMeshRenderer3D {
         require(target.width > 0 && target.height > 0) { "3D render target must have positive dimensions." }
         val root = sampleRoot(performance, timeSeconds)
         val boneRotations = model.bindJoints.keys.associateWith { role -> sampleBoneRotation(performance, role, timeSeconds) }
+        val bounds = NativeModelBounds3D.from(model)
         val skinned = model.vertices.map { vertex ->
             skinVertex(vertex, model, boneRotations, root)
         }
 
         val projected = skinned.map { vertex -> project(vertex, camera, target.width, target.height) }
+        val light = requireNotNull(normalize(NativeStagePoint(0.35, 0.70, 1.0)))
         val triangles = model.triangles.mapNotNull { triangle ->
             val a = projected.getOrNull(triangle.a) ?: return@mapNotNull null
             val b = projected.getOrNull(triangle.b) ?: return@mapNotNull null
             val c = projected.getOrNull(triangle.c) ?: return@mapNotNull null
-            if (a == null || b == null || c == null) return@mapNotNull null
             val faceNormal = normalize(cross(sub(b.world, a.world), sub(c.world, a.world))) ?: return@mapNotNull null
-            val light = normalize(NativeStagePoint(0.35, 0.70, 1.0)) ?: return@mapNotNull null
             val shade = (0.36 + 0.64 * abs(dot(faceNormal, light))).coerceIn(0.24, 1.0)
+            val bindPosition = NativeStagePoint(
+                (a.bindPosition.x + b.bindPosition.x + c.bindPosition.x) / 3.0,
+                (a.bindPosition.y + b.bindPosition.y + c.bindPosition.y) / 3.0,
+                (a.bindPosition.z + b.bindPosition.z + c.bindPosition.z) / 3.0,
+            )
+            val bindNormal = normalize(
+                NativeStagePoint(
+                    a.bindNormal.x + b.bindNormal.x + c.bindNormal.x,
+                    a.bindNormal.y + b.bindNormal.y + c.bindNormal.y,
+                    a.bindNormal.z + b.bindNormal.z + c.bindNormal.z,
+                ),
+            ) ?: a.bindNormal
             ProjectedTriangle(
                 a = a,
                 b = b,
@@ -154,6 +294,7 @@ internal object NativeSkinnedMeshRenderer3D {
                 averageDepth = (a.depth + b.depth + c.depth) / 3.0,
                 material = a.material,
                 shade = shade,
+                textureColor = palette.texturedColor(a.material, bindPosition, bindNormal, bounds),
             )
         }.sortedByDescending { it.averageDepth }
 
@@ -177,7 +318,7 @@ internal object NativeSkinnedMeshRenderer3D {
             path.lineTo(triangle.b.x.toFloat(), triangle.b.y.toFloat())
             path.lineTo(triangle.c.x.toFloat(), triangle.c.y.toFloat())
             path.close()
-            paint.color = shadeColor(palette.color(triangle.material), triangle.shade)
+            paint.color = shadeColor(triangle.textureColor, triangle.shade)
             canvas.drawPath(path, paint)
 
             minX = min(minX, min(triangle.a.x, min(triangle.b.x, triangle.c.x)))
@@ -235,7 +376,13 @@ internal object NativeSkinnedMeshRenderer3D {
             nz += normal.z * influence.weight
         }
         val normal = normalize(NativeStagePoint(nx, ny, nz)) ?: NativeStagePoint(0.0, 0.0, 1.0)
-        return SkinnedVertex(NativeStagePoint(px, py, pz), normal, vertex.material)
+        return SkinnedVertex(
+            world = NativeStagePoint(px, py, pz),
+            normal = normal,
+            bindPosition = vertex.bindPosition,
+            bindNormal = vertex.bindNormal,
+            material = vertex.material,
+        )
     }
 
     private fun project(
@@ -263,6 +410,9 @@ internal object NativeSkinnedMeshRenderer3D {
             y = (0.5 - ndcY * 0.5) * height,
             depth = depth,
             world = vertex.world,
+            normal = vertex.normal,
+            bindPosition = vertex.bindPosition,
+            bindNormal = vertex.bindNormal,
             material = vertex.material,
         )
     }
