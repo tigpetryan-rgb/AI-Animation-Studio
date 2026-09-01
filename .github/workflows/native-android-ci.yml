@@ -76,6 +76,27 @@ jobs:
             exit 1
           fi
 
+          if unzip -p "$APK" 'classes*.dex' | grep -a --fixed-strings 'Landroid/webkit/WebView;' >/dev/null; then
+            echo '=== Remaining WebView dependency graph ==='
+            ./gradlew :app:dependencies --configuration debugRuntimeClasspath --no-daemon || true
+            echo '=== Remaining WebView DEX context ==='
+            DEXDUMP="$(find "$ANDROID_HOME/build-tools" -type f -name dexdump | sort -V | tail -n 1)"
+            if [ -n "$DEXDUMP" ]; then
+              rm -rf /tmp/m56-dex && mkdir -p /tmp/m56-dex
+              unzip -j "$APK" 'classes*.dex' -d /tmp/m56-dex >/dev/null
+              for dex in /tmp/m56-dex/classes*.dex; do
+                dump="${dex}.dump"
+                "$DEXDUMP" -d "$dex" > "$dump"
+                if grep -q --fixed-strings 'Landroid/webkit/WebView;' "$dump"; then
+                  echo "--- $(basename "$dex") ---"
+                  grep -n -B 120 -A 120 --fixed-strings 'Landroid/webkit/WebView;' "$dump" | head -n 1200 || true
+                fi
+              done
+            else
+              echo 'dexdump was not found under Android build-tools.'
+            fi
+          fi
+
           for forbidden in \
             'Landroid/webkit/WebView;' \
             'Landroid/webkit/JavascriptInterface;' \
