@@ -17,6 +17,7 @@ internal data class NativeProductionSnapshot(
     val performance: NativeActingPerformance? = null,
     val camera: NativeCameraExecution? = null,
     val sceneIr: NativeSceneIrV1? = null,
+    val sceneTimeline: NativeSceneTimelinePlan? = null,
     val sceneSemanticStatus: NativeSceneSemanticStatus? = null,
     val diagnostics: List<NativeDiagnostic> = emptyList(),
 ) {
@@ -118,6 +119,39 @@ internal object NativeProductionCoordinator {
         }
 
         val sceneIr = requireNotNull(compilation.ir)
+        val sceneTimeline = when (val timelineResult = NativeSceneTimelineCompiler.singleShot(sceneIr)) {
+            is NativeSceneTimelineResult.Ready -> timelineResult.timeline
+            is NativeSceneTimelineResult.Rejected -> return NativeProductionSnapshot(
+                stage = NativeProductionStage.BLOCKING_VALID,
+                sourceCommit = sourceCommit,
+                referenceSha256 = exactReference.sha256,
+                blocking = preliminaryBlocking,
+                sceneIr = sceneIr,
+                sceneSemanticStatus = compilation.status,
+                diagnostics = compilation.diagnostics + timelineResult.diagnostics,
+            )
+        }
+        if (
+            sceneTimeline.sourceCommit != sourceCommit ||
+            sceneTimeline.referenceSha256 != exactReference.sha256 ||
+            sceneTimeline.scriptSha256 != sceneIr.scriptSha256
+        ) {
+            return NativeProductionSnapshot(
+                stage = NativeProductionStage.BLOCKING_VALID,
+                sourceCommit = sourceCommit,
+                referenceSha256 = exactReference.sha256,
+                blocking = preliminaryBlocking,
+                sceneIr = sceneIr,
+                sceneSemanticStatus = compilation.status,
+                diagnostics = listOf(
+                    NativeDiagnostic(
+                        "SCENE_TIMELINE_IDENTITY",
+                        "Compiled scene timeline no longer matches the exact script/reference/build identity.",
+                    ),
+                ),
+            )
+        }
+
         val deterministicScript = NativeSceneIrLowerer.lowerToLegacyDeterministicScript(sceneIr)
         val production = prepare(
             chatId = chatId,
@@ -128,6 +162,7 @@ internal object NativeProductionCoordinator {
         )
         return production.copy(
             sceneIr = sceneIr,
+            sceneTimeline = sceneTimeline,
             sceneSemanticStatus = compilation.status,
             diagnostics = if (production.stage == NativeProductionStage.READY_FOR_RENDER) {
                 compilation.diagnostics + production.diagnostics
