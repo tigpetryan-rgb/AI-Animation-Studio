@@ -49,6 +49,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
+private enum class StudioScriptMode { NATURAL_LANGUAGE, DETERMINISTIC }
+
 @UnstableApi
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -72,6 +74,7 @@ private fun NativeStudioApp() {
     val exportScope = rememberCoroutineScope()
     var projectName by rememberSaveable { mutableStateOf("Untitled project") }
     var prompt by rememberSaveable { mutableStateOf("") }
+    var scriptMode by rememberSaveable { mutableStateOf(StudioScriptMode.NATURAL_LANGUAGE) }
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
     var reference by remember { mutableStateOf<PersistedReferenceAsset?>(null) }
     var referenceError by remember { mutableStateOf<String?>(null) }
@@ -131,7 +134,7 @@ private fun NativeStudioApp() {
                 title = {
                     Column {
                         Text("AI Animation Studio")
-                        Text("Native Android · Compose", style = MaterialTheme.typography.labelSmall)
+                        Text("Native Android · Compose · M57 Scene IR", style = MaterialTheme.typography.labelSmall)
                     }
                 },
             )
@@ -188,6 +191,21 @@ private fun NativeStudioApp() {
             }
 
             StudioCard(title = "Animation script") {
+                Text("Mode: ${if (scriptMode == StudioScriptMode.NATURAL_LANGUAGE) "Natural Language" else "Deterministic"}", fontWeight = FontWeight.SemiBold)
+                Button(
+                    onClick = {
+                        scriptMode = StudioScriptMode.NATURAL_LANGUAGE
+                        productionSnapshot = null
+                    },
+                    enabled = scriptMode != StudioScriptMode.NATURAL_LANGUAGE && !exportRunning,
+                ) { Text("Natural Language") }
+                Button(
+                    onClick = {
+                        scriptMode = StudioScriptMode.DETERMINISTIC
+                        productionSnapshot = null
+                    },
+                    enabled = scriptMode != StudioScriptMode.DETERMINISTIC && !exportRunning,
+                ) { Text("Deterministic / regression") }
                 OutlinedTextField(
                     value = prompt,
                     onValueChange = {
@@ -196,11 +214,15 @@ private fun NativeStudioApp() {
                     },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !exportRunning,
-                    label = { Text("Deterministic shot script") },
+                    label = { Text(if (scriptMode == StudioScriptMode.NATURAL_LANGUAGE) "Natural-language scene" else "Deterministic shot script") },
                     minLines = 4,
                 )
                 Text(
-                    "Current native semantic parser stays fail-closed. Example: ACTOR WAIT 2 seconds 320x240 12 fps.",
+                    if (scriptMode == StudioScriptMode.NATURAL_LANGUAGE) {
+                        "Armenian/English/Russian Scene IR boundary is fail-closed. This APK includes a bounded offline supported-subset semantic probe for deterministic CI/device proof; broad language understanding must use the secure provider-neutral model backend and never an API secret inside the APK. Example: Կերպարը հանգիստ սպասում է 24 վայրկյան։ Ելքը՝ 320×240, 12 կադր/վրկ։"
+                    } else {
+                        "Legacy deterministic regression path. Example: ACTOR WAIT 2 seconds 320x240 12 fps."
+                    },
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -212,19 +234,42 @@ private fun NativeStudioApp() {
                 )
                 Button(
                     onClick = {
-                        productionSnapshot = NativeProductionCoordinator.prepare(
-                            chatId = projectName,
-                            prompt = prompt,
-                            reference = reference,
-                            sourceCommit = BuildConfig.STUDIO_COMMIT_SHA,
-                        )
+                        productionSnapshot = if (scriptMode == StudioScriptMode.NATURAL_LANGUAGE) {
+                            NativeProductionCoordinator.prepareNaturalLanguage(
+                                chatId = projectName,
+                                prompt = prompt,
+                                reference = reference,
+                                sourceCommit = BuildConfig.STUDIO_COMMIT_SHA,
+                                backend = NativeSupportedSubsetSemanticProbe,
+                            )
+                        } else {
+                            NativeProductionCoordinator.prepare(
+                                chatId = projectName,
+                                prompt = prompt,
+                                reference = reference,
+                                sourceCommit = BuildConfig.STUDIO_COMMIT_SHA,
+                            )
+                        }
                     },
                     enabled = intakeReady && !exportRunning,
                 ) {
-                    Text("Prepare native production")
+                    Text(if (scriptMode == StudioScriptMode.NATURAL_LANGUAGE) "Compile Scene IR + prepare" else "Prepare deterministic production")
                 }
 
                 productionSnapshot?.let { snapshot ->
+                    snapshot.sceneSemanticStatus?.let { status ->
+                        Text("Semantic status: $status", fontWeight = FontWeight.SemiBold)
+                    }
+                    snapshot.sceneIr?.let { ir ->
+                        Text("Language: ${ir.detectedLanguage} · Scene IR v${ir.schemaVersion}")
+                        Text("Semantic provenance: ${ir.semanticProvider} / ${ir.semanticModel}", style = MaterialTheme.typography.bodySmall)
+                        Text("Script SHA-256 ${ir.scriptSha256}", style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            "Plan: ${ir.actions.joinToString(" → ") { action -> action.concept.name }} · ${ir.output.durationSeconds}s · ${ir.output.width}×${ir.output.height} · ${ir.output.frameRate} fps",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        ir.warnings.forEach { Text("Warning: $it", style = MaterialTheme.typography.bodySmall) }
+                    }
                     Text("Stage: ${snapshot.stage}", fontWeight = FontWeight.SemiBold)
                     GateLine("Blocking", snapshot.blockingReady)
                     GateLine("Performance", snapshot.performanceReady)
@@ -271,6 +316,7 @@ private fun NativeStudioApp() {
                 Text("UI runtime: NATIVE_COMPOSE")
                 Text("WebView runtime: NOT USED")
                 Text("Browser DOM/event state: NOT USED")
+                Text("Scene model secret in APK: NOT ALLOWED")
                 Text("Source identity: APP_PRIVATE_SHA256 + exact build SHA")
                 Spacer(Modifier.height(4.dp))
 
