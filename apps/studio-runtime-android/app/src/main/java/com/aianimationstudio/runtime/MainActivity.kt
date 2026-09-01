@@ -1,11 +1,9 @@
 package com.aianimationstudio.runtime
 
 import android.content.Intent
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -61,54 +59,48 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private data class ReferenceAsset(
-    val uri: Uri,
-    val displayName: String,
-    val mimeType: String,
-    val sizeBytes: Long,
-    val width: Int,
-    val height: Int,
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NativeStudioApp() {
     val context = LocalContext.current
+    val sourceStore = remember(context) { NativeSourceStore(context) }
     var projectName by rememberSaveable { mutableStateOf("Untitled project") }
     var prompt by rememberSaveable { mutableStateOf("") }
-    var referenceUriText by rememberSaveable { mutableStateOf<String?>(null) }
-    var reference by remember { mutableStateOf<ReferenceAsset?>(null) }
+    var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
+    var reference by remember { mutableStateOf<PersistedReferenceAsset?>(null) }
     var referenceError by remember { mutableStateOf<String?>(null) }
+    var restoringReference by remember { mutableStateOf(true) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         try {
             context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         } catch (_: SecurityException) {
-            // Some document providers do not grant persistence; the URI still works for this session.
+            // Persistence of the provider URI is optional because production owns a private byte-for-byte copy.
         }
-        referenceUriText = uri.toString()
+        pendingImportUri = uri
     }
 
-    LaunchedEffect(referenceUriText) {
-        val uriText = referenceUriText
-        if (uriText == null) {
-            reference = null
-            referenceError = null
-            return@LaunchedEffect
-        }
-        runCatching { loadReferenceAsset(context, Uri.parse(uriText)) }
+    LaunchedEffect(Unit) {
+        reference = withContext(Dispatchers.IO) { sourceStore.restoreVerified() }
+        restoringReference = false
+    }
+
+    LaunchedEffect(pendingImportUri) {
+        val uri = pendingImportUri ?: return@LaunchedEffect
+        referenceError = null
+        runCatching { withContext(Dispatchers.IO) { sourceStore.importFrom(uri) } }
             .onSuccess {
                 reference = it
-                referenceError = null
+                pendingImportUri = null
             }
             .onFailure {
-                reference = null
-                referenceError = it.message ?: "Unable to read the selected reference image."
+                referenceError = it.message ?: "Unable to persist the selected reference image."
+                pendingImportUri = null
             }
     }
 
-    val intakeReady = reference != null && prompt.isNotBlank()
+    val intakeReady = reference != null && prompt.isNotBlank() && !restoringReference
 
     Scaffold(
         topBar = {
@@ -145,13 +137,27 @@ private fun NativeStudioApp() {
             }
 
             StudioCard(title = "Reference image") {
-                Button(onClick = { picker.launch(arrayOf("image/*")) }) {
-                    Text(if (reference == null) "Choose image" else "Replace image")
+                Button(onClick = { picker.launch(arrayOf("image/*")) }, enabled = pendingImportUri == null) {
+                    Text(
+                        when {
+                            pendingImportUri != null -> "Importing exact bytes…"
+                            reference == null -> "Choose image"
+                            else -> "Replace image"
+                        },
+                    )
+                }
+                if (restoringReference) {
+                    Text("Verifying persisted source bytes…")
                 }
                 reference?.let { asset ->
                     Text(asset.displayName, fontWeight = FontWeight.SemiBold)
                     Text("${asset.mimeType} · ${formatBytes(asset.sizeBytes)}")
                     Text("${asset.width} × ${asset.height} px")
+                    Text("SHA-256 ${asset.sha256.take(16)}…", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        "Lifecycle source continuity: VERIFIED · exact bytes in app-private storage",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
                 referenceError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
@@ -168,15 +174,16 @@ private fun NativeStudioApp() {
 
             StudioCard(title = "Production") {
                 Text(
-                    if (intakeReady) "Native intake: READY" else "Native intake: waiting for reference + prompt",
+                    if (intakeReady) "Native intake: READY" else "Native intake: waiting for verified reference + prompt",
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text("UI runtime: NATIVE_COMPOSE")
                 Text("WebView runtime: NOT USED")
                 Text("Browser DOM/event state: NOT USED")
+                Text("Source identity: APP_PRIVATE_SHA256")
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Native render/export port is not enabled yet. Export stays blocked until the existing source-bound renderer and MP4 verification contract are ported and tested natively.",
+                    "Native render/export port is not enabled yet. Export stays blocked until the source-bound renderer and native MP4 verification contract are wired end-to-end.",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Button(onClick = {}, enabled = false) {
@@ -217,37 +224,6 @@ private fun StudioCard(title: String, content: @Composable ColumnScope.() -> Uni
         )
     }
 }
-
-private suspend fun loadReferenceAsset(context: android.content.Context, uri: Uri): ReferenceAsset =
-    withContext(Dispatchers.IO) {
-        val resolver = context.contentResolver
-        var name = "reference-image"
-        var size = -1L
-        resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-                if (nameIndex >= 0) name = cursor.getString(nameIndex) ?: name
-                if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) size = cursor.getLong(sizeIndex)
-            }
-        }
-        val mime = resolver.getType(uri) ?: "application/octet-stream"
-        require(mime.startsWith("image/")) { "The selected file is not an image." }
-
-        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
-            ?: error("Unable to open the selected image.")
-        require(options.outWidth > 0 && options.outHeight > 0) { "Unable to decode image dimensions." }
-
-        ReferenceAsset(
-            uri = uri,
-            displayName = name,
-            mimeType = mime,
-            sizeBytes = size.coerceAtLeast(0L),
-            width = options.outWidth,
-            height = options.outHeight,
-        )
-    }
 
 private fun formatBytes(bytes: Long): String = when {
     bytes >= 1_048_576L -> String.format(Locale.ROOT, "%.1f MB", bytes / 1_048_576.0)
