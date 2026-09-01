@@ -192,7 +192,20 @@ internal class NaturalLanguageSceneCompiler(
             )
         }
 
-        val document = runCatching { backend.infer(request) }.getOrElse { failure ->
+        val document = try {
+            backend.infer(request)
+        } catch (failure: NativeSceneBackendException) {
+            return NativeSceneCompilation(
+                NativeSceneSemanticStatus.INVALID_SCHEMA,
+                null,
+                listOf(
+                    NativeDiagnostic(
+                        failure.category.diagnosticCode,
+                        "Semantic backend failed closed: ${failure.message ?: failure.category.name}.",
+                    ),
+                ),
+            )
+        } catch (failure: Exception) {
             return NativeSceneCompilation(
                 NativeSceneSemanticStatus.INVALID_SCHEMA,
                 null,
@@ -335,41 +348,59 @@ internal object NativeSupportedSubsetSemanticProbe : NativeSceneSemanticBackend 
             }
         }
 
-        when (language) {
-            NativeSceneLanguage.ARMENIAN, NativeSceneLanguage.MIXED -> {
-                if (Regex("(?:սպաս|հանգիստ\\s+(?:մն|կանգ)|անշարժ)").containsMatchIn(lower)) add(NativeSceneConcept.WAIT)
-                if (Regex("(?:նստ|նստում)").containsMatchIn(lower)) add(NativeSceneConcept.SIT)
-                if (Regex("(?:զարմ|արձագանք)").containsMatchIn(lower)) add(NativeSceneConcept.REACT)
-                if (armenianSpeech.containsMatchIn(lower)) add(NativeSceneConcept.SPEAK, dialogue = quotedDialogue(text))
-                if (Regex("(?:քայլ|մոտեն)|(?<![\\p{L}\\p{M}])գնում\\s+է(?![\\p{L}\\p{M}])").containsMatchIn(lower)) add(NativeSceneConcept.WALK_TO, target = "semantic-target")
-                if (Regex("(?:վազ|վազում)").containsMatchIn(lower)) add(NativeSceneConcept.RUN_TO, target = "semantic-target")
-                if (Regex("(?:վերցն|վերցնում)").containsMatchIn(lower)) add(NativeSceneConcept.PICK_UP, target = "semantic-target")
-                if (Regex("(?:բաց|բացում)").containsMatchIn(lower)) add(NativeSceneConcept.OPEN, target = "semantic-target")
-                if (Regex("(?:փակ|փակում)").containsMatchIn(lower)) add(NativeSceneConcept.CLOSE, target = "semantic-target")
-            }
-            NativeSceneLanguage.ENGLISH -> {
-                if (Regex("\\b(?:wait|waits|waiting|remain still|stands quietly)\\b").containsMatchIn(lower)) add(NativeSceneConcept.WAIT)
-                if (Regex("\\b(?:sit|sits|sitting)\\b").containsMatchIn(lower)) add(NativeSceneConcept.SIT)
-                if (Regex("\\b(?:react|reacts|surprised)\\b").containsMatchIn(lower)) add(NativeSceneConcept.REACT)
-                if (Regex("\\b(?:say|says|speak|speaks)\\b").containsMatchIn(lower)) add(NativeSceneConcept.SPEAK, dialogue = quotedDialogue(text))
-                if (Regex("\\b(?:walk|walks|approach|approaches)\\b").containsMatchIn(lower)) add(NativeSceneConcept.WALK_TO, target = "semantic-target")
-                if (Regex("\\b(?:run|runs)\\b").containsMatchIn(lower)) add(NativeSceneConcept.RUN_TO, target = "semantic-target")
-                if (Regex("\\b(?:pick up|picks up)\\b").containsMatchIn(lower)) add(NativeSceneConcept.PICK_UP, target = "semantic-target")
-                if (Regex("\\b(?:open|opens)\\b").containsMatchIn(lower)) add(NativeSceneConcept.OPEN, target = "semantic-target")
-                if (Regex("\\b(?:close|closes)\\b").containsMatchIn(lower)) add(NativeSceneConcept.CLOSE, target = "semantic-target")
-            }
-            NativeSceneLanguage.RUSSIAN -> {
-                if (Regex("(?:жд[её]т|ожидает|стоит\\s+спокойно|неподвижно)").containsMatchIn(lower)) add(NativeSceneConcept.WAIT)
-                if (Regex("(?:садится|сидит)").containsMatchIn(lower)) add(NativeSceneConcept.SIT)
-                if (Regex("(?:реагирует|удивл)").containsMatchIn(lower)) add(NativeSceneConcept.REACT)
-                if (Regex("(?:говорит|произносит|скажет)").containsMatchIn(lower)) add(NativeSceneConcept.SPEAK, dialogue = quotedDialogue(text))
-                if (Regex("(?:ид[её]т|подходит|шагает)").containsMatchIn(lower)) add(NativeSceneConcept.WALK_TO, target = "semantic-target")
-                if (Regex("(?:бежит|побежит)").containsMatchIn(lower)) add(NativeSceneConcept.RUN_TO, target = "semantic-target")
-                if (Regex("(?:бер[её]т|поднимает)").containsMatchIn(lower)) add(NativeSceneConcept.PICK_UP, target = "semantic-target")
-                if (Regex("(?:открывает|открыть)").containsMatchIn(lower)) add(NativeSceneConcept.OPEN, target = "semantic-target")
-                if (Regex("(?:закрывает|закрыть)").containsMatchIn(lower)) add(NativeSceneConcept.CLOSE, target = "semantic-target")
-            }
-            NativeSceneLanguage.UNKNOWN -> Unit
+        val useArmenian = language == NativeSceneLanguage.ARMENIAN || language == NativeSceneLanguage.MIXED
+        val useEnglish = language == NativeSceneLanguage.ENGLISH || language == NativeSceneLanguage.MIXED
+        val useRussian = language == NativeSceneLanguage.RUSSIAN || language == NativeSceneLanguage.MIXED
+
+        if (useArmenian) {
+            if (Regex("(?:սպաս|հանգիստ\\s+(?:մն|կանգ)|անշարժ)").containsMatchIn(lower)) add(NativeSceneConcept.WAIT)
+            if (Regex("(?:նստ|նստում)").containsMatchIn(lower)) add(NativeSceneConcept.SIT)
+            if (Regex("(?:ոտքի\\s+կանգն|կանգնում\\s+է)").containsMatchIn(lower)) add(NativeSceneConcept.STAND)
+            if (Regex("(?:զարմ|արձագանք)").containsMatchIn(lower)) add(NativeSceneConcept.REACT)
+            if (armenianSpeech.containsMatchIn(lower)) add(NativeSceneConcept.SPEAK, dialogue = quotedDialogue(text))
+            if (Regex("(?:քայլ|մոտեն)|(?<![\\p{L}\\p{M}])գնում\\s+է(?![\\p{L}\\p{M}])").containsMatchIn(lower)) add(NativeSceneConcept.WALK_TO, target = "semantic-target")
+            if (Regex("(?:վազ|վազում)").containsMatchIn(lower)) add(NativeSceneConcept.RUN_TO, target = "semantic-target")
+            if (Regex("(?:նայ|դիտ)").containsMatchIn(lower)) add(NativeSceneConcept.LOOK_AT, target = "semantic-target")
+            if (Regex("(?:վերցն|վերցնում)").containsMatchIn(lower)) add(NativeSceneConcept.PICK_UP, target = "semantic-target")
+            if (Regex("(?:բաց|բացում)").containsMatchIn(lower)) add(NativeSceneConcept.OPEN, target = "semantic-target")
+            if (Regex("(?:փակ|փակում)").containsMatchIn(lower)) add(NativeSceneConcept.CLOSE, target = "semantic-target")
+            if (Regex("(?:տեսախցիկ|խցիկ).*(?:շարժ|պանորամ|զում)").containsMatchIn(lower)) add(NativeSceneConcept.CAMERA_MOVE)
+            if (Regex("(?:լույս|լուսավոր).*(?:փոխ|ուժեղ|թուլ|մգ|պայծառ)").containsMatchIn(lower)) add(NativeSceneConcept.LIGHTING_CHANGE)
+            if (Regex("(?:միջավայր|ֆոն|եղանակ).*(?:փոխ|դառն|դարձ)").containsMatchIn(lower)) add(NativeSceneConcept.ENVIRONMENT_CHANGE)
+        }
+
+        if (useEnglish) {
+            if (Regex("\\b(?:wait|waits|waiting|remain still|stands quietly)\\b").containsMatchIn(lower)) add(NativeSceneConcept.WAIT)
+            if (Regex("\\b(?:sit|sits|sitting)\\b").containsMatchIn(lower)) add(NativeSceneConcept.SIT)
+            if (Regex("\\b(?:stand up|stands up)\\b").containsMatchIn(lower)) add(NativeSceneConcept.STAND)
+            if (Regex("\\b(?:react|reacts|surprised)\\b").containsMatchIn(lower)) add(NativeSceneConcept.REACT)
+            if (Regex("\\b(?:say|says|speak|speaks)\\b").containsMatchIn(lower)) add(NativeSceneConcept.SPEAK, dialogue = quotedDialogue(text))
+            if (Regex("\\b(?:walk|walks|approach|approaches)\\b").containsMatchIn(lower)) add(NativeSceneConcept.WALK_TO, target = "semantic-target")
+            if (Regex("\\b(?:run|runs)\\b").containsMatchIn(lower)) add(NativeSceneConcept.RUN_TO, target = "semantic-target")
+            if (Regex("\\b(?:look at|looks at|watch|watches)\\b").containsMatchIn(lower)) add(NativeSceneConcept.LOOK_AT, target = "semantic-target")
+            if (Regex("\\b(?:pick up|picks up)\\b").containsMatchIn(lower)) add(NativeSceneConcept.PICK_UP, target = "semantic-target")
+            if (Regex("\\b(?:open|opens)\\b").containsMatchIn(lower)) add(NativeSceneConcept.OPEN, target = "semantic-target")
+            if (Regex("\\b(?:close|closes)\\b").containsMatchIn(lower)) add(NativeSceneConcept.CLOSE, target = "semantic-target")
+            if (Regex("\\b(?:camera|pan|pans|tilt|tilts|dolly|dollies|track|tracks|zoom|zooms)\\b").containsMatchIn(lower)) add(NativeSceneConcept.CAMERA_MOVE)
+            if (Regex("\\b(?:lighting|lights?|illuminates?|brightens?|dims?)\\b").containsMatchIn(lower)) add(NativeSceneConcept.LIGHTING_CHANGE)
+            if (Regex("\\b(?:environment|background|weather|set changes?)\\b").containsMatchIn(lower)) add(NativeSceneConcept.ENVIRONMENT_CHANGE)
+        }
+
+        if (useRussian) {
+            if (Regex("(?:жд[её]т|ожидает|стоит\\s+спокойно|неподвижно)").containsMatchIn(lower)) add(NativeSceneConcept.WAIT)
+            if (Regex("(?:садится|сидит)").containsMatchIn(lower)) add(NativeSceneConcept.SIT)
+            if (Regex("(?:вста[её]т|встать)").containsMatchIn(lower)) add(NativeSceneConcept.STAND)
+            if (Regex("(?:реагирует|удивл)").containsMatchIn(lower)) add(NativeSceneConcept.REACT)
+            if (Regex("(?:говорит|произносит|скажет)").containsMatchIn(lower)) add(NativeSceneConcept.SPEAK, dialogue = quotedDialogue(text))
+            if (Regex("(?:ид[её]т|подходит|шагает)").containsMatchIn(lower)) add(NativeSceneConcept.WALK_TO, target = "semantic-target")
+            if (Regex("(?:бежит|побежит)").containsMatchIn(lower)) add(NativeSceneConcept.RUN_TO, target = "semantic-target")
+            if (Regex("(?:смотрит|посмотрит|глядит)").containsMatchIn(lower)) add(NativeSceneConcept.LOOK_AT, target = "semantic-target")
+            if (Regex("(?:бер[её]т|поднимает)").containsMatchIn(lower)) add(NativeSceneConcept.PICK_UP, target = "semantic-target")
+            if (Regex("(?:открывает|открыть)").containsMatchIn(lower)) add(NativeSceneConcept.OPEN, target = "semantic-target")
+            if (Regex("(?:закрывает|закрыть)").containsMatchIn(lower)) add(NativeSceneConcept.CLOSE, target = "semantic-target")
+            if (Regex("(?:камера|панорам|зум|наезд|отъезд)").containsMatchIn(lower)) add(NativeSceneConcept.CAMERA_MOVE)
+            if (Regex("(?:свет|освещ).*(?:меня|ярч|тускл|гас|включ)").containsMatchIn(lower)) add(NativeSceneConcept.LIGHTING_CHANGE)
+            if (Regex("(?:окружение|фон|погода).*(?:меня|станов|превращ)").containsMatchIn(lower)) add(NativeSceneConcept.ENVIRONMENT_CHANGE)
         }
         return actions
     }
