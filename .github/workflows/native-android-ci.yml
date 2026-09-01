@@ -86,6 +86,7 @@ jobs:
       - name: Kotlin and Android verification
         working-directory: apps/studio-runtime-android
         run: |
+          set -euo pipefail
           RUNTIME_VERSION="0.3.0-m57-ci+${AISTUDIO_SOURCE_SHA:0:12}"
           ./gradlew \
             :app:testReleaseUnitTest \
@@ -97,19 +98,52 @@ jobs:
             -PruntimeVersionCode="${GITHUB_RUN_NUMBER}" \
             --no-daemon
 
+      - name: Verify built native APK exists
+        working-directory: apps/studio-runtime-android
+        shell: bash
+        run: |
+          set -euo pipefail
           APK="app/build/outputs/apk/release/app-release.apk"
-          PROVENANCE="app/build/outputs/apk/release/M57_PROVENANCE.txt"
-          test -s "$APK"
+          if [[ ! -s "$APK" ]]; then
+            echo "Built native APK is missing or empty at expected path: $APK" >&2
+            find app/build/outputs/apk -maxdepth 3 -type f -print 2>/dev/null || true
+            exit 1
+          fi
+          echo "Built native APK checkpoint PASS: $APK"
 
+      - name: Verify native APK signature
+        working-directory: apps/studio-runtime-android
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/release/app-release.apk"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
-          test -n "$APKSIGNER"
+          if [[ -z "$APKSIGNER" ]]; then
+            echo "Android SDK apksigner was not found under $ANDROID_HOME/build-tools." >&2
+            exit 1
+          fi
+          echo "Using apksigner: $APKSIGNER"
           "$APKSIGNER" verify "$APK"
+          echo "Native APK signature checkpoint PASS."
 
+      - name: Verify native APK embeds exact source SHA
+        working-directory: apps/studio-runtime-android
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/release/app-release.apk"
           if ! unzip -p "$APK" 'classes*.dex' | grep -a --fixed-strings "$AISTUDIO_SOURCE_SHA" >/dev/null; then
             echo "Built native APK does not embed the exact workflow source SHA." >&2
             exit 1
           fi
+          echo "Embedded exact source SHA checkpoint PASS."
 
+      - name: Verify native APK browser-free bytecode
+        working-directory: apps/studio-runtime-android
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/release/app-release.apk"
           for forbidden in \
             'Landroid/webkit/WebView;' \
             'Landroid/webkit/JavascriptInterface;' \
@@ -120,16 +154,47 @@ jobs:
               exit 1
             fi
           done
+          echo "Browser-free bytecode checkpoint PASS."
 
+      - name: Verify no provider secret is packaged in native APK
+        working-directory: apps/studio-runtime-android
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/release/app-release.apk"
           if unzip -p "$APK" 'classes*.dex' | grep -a -E 'sk-[A-Za-z0-9_-]{20,}|AIza[A-Za-z0-9_-]{20,}|anthropic_[A-Za-z0-9_-]{20,}' >/dev/null; then
             echo "Built native APK contains a provider credential-like literal." >&2
             exit 1
           fi
+          echo "Provider-secret APK checkpoint PASS."
+
+      - name: Generate and verify M57 APK provenance
+        working-directory: apps/studio-runtime-android
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/release/app-release.apk"
+          PROVENANCE="app/build/outputs/apk/release/M57_PROVENANCE.txt"
+          RUNTIME_VERSION="0.3.0-m57-ci+${AISTUDIO_SOURCE_SHA:0:12}"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          if [[ -z "$APKSIGNER" ]]; then
+            echo "Android SDK apksigner was not found while generating provenance." >&2
+            exit 1
+          fi
 
           APK_SHA256="$(sha256sum "$APK" | awk '{print $1}')"
-          SIGNER_SHA256="$("$APKSIGNER" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
-          test -n "$APK_SHA256"
-          test -n "$SIGNER_SHA256"
+          if [[ -z "$APK_SHA256" ]]; then
+            echo "APK SHA-256 extraction returned an empty value." >&2
+            exit 1
+          fi
+
+          CERTS_OUTPUT="$("$APKSIGNER" verify --print-certs "$APK")"
+          SIGNER_SHA256="$(printf '%s\n' "$CERTS_OUTPUT" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
+          if [[ -z "$SIGNER_SHA256" ]]; then
+            echo "Signer certificate SHA-256 extraction returned an empty value." >&2
+            printf '%s\n' "$CERTS_OUTPUT" >&2
+            exit 1
+          fi
 
           cat > "$PROVENANCE" <<EOF
           schema_version=1
@@ -151,6 +216,7 @@ jobs:
           grep -Fx "source_sha=${AISTUDIO_SOURCE_SHA}" "$PROVENANCE"
           grep -Fx "apk_sha256=${APK_SHA256}" "$PROVENANCE"
           grep -Fx "signer_certificate_sha256=${SIGNER_SHA256}" "$PROVENANCE"
+          echo "M57 APK provenance checkpoint PASS."
 
       - name: Upload native Android APK
         uses: actions/upload-artifact@v4
