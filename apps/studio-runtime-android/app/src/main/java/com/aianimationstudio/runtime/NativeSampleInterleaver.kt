@@ -16,6 +16,10 @@ internal data class NativeEncodedSamplePacket(
 internal class NativeSampleInterleaver(
     private val sink: (NativeEncodedSamplePacket) -> Unit,
 ) {
+    private companion object {
+        const val MAX_PENDING_PACKETS = 8
+    }
+
     private val video = ArrayDeque<NativeEncodedSamplePacket>()
     private val audio = ArrayDeque<NativeEncodedSamplePacket>()
     private var videoEnded = false
@@ -46,6 +50,9 @@ internal class NativeSampleInterleaver(
             }
         }
         drain()
+        check(pendingPacketCount() <= MAX_PENDING_PACKETS) {
+            "Encoded sample interleaver exceeded its bounded $MAX_PENDING_PACKETS-packet window."
+        }
     }
 
     fun end(track: NativeEncodedTrack) {

@@ -43,4 +43,12 @@ class NativeSampleInterleaverTest {
         interleaver.offer(packet(NativeEncodedTrack.VIDEO, 10))
         interleaver.offer(packet(NativeEncodedTrack.VIDEO, 9))
     }
+
+    @Test(expected = IllegalStateException::class)
+    fun `fails closed if one encoder outruns the bounded interleave window`() {
+        val interleaver = NativeSampleInterleaver { }
+        repeat(9) { index ->
+            interleaver.offer(packet(NativeEncodedTrack.VIDEO, index.toLong()))
+        }
+    }
 }
