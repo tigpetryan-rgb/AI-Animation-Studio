@@ -422,19 +422,26 @@ private class NativeEglCodecSurface(
         check(EGL14.eglInitialize(display, version, 0, version, 1)) { "Unable to initialize EGL for codec surface." }
 
         val attributes = intArrayOf(
+            EGL14.EGL_SURFACE_TYPE, EGL14.EGL_WINDOW_BIT,
             EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
             EGL14.EGL_RED_SIZE, 8,
             EGL14.EGL_GREEN_SIZE, 8,
             EGL14.EGL_BLUE_SIZE, 8,
             EGL14.EGL_ALPHA_SIZE, 8,
+            EGLExt.EGL_RECORDABLE_ANDROID, EGL14.EGL_TRUE,
             EGL14.EGL_NONE,
         )
         val configs = arrayOfNulls<EGLConfig>(1)
         val count = IntArray(1)
         check(EGL14.eglChooseConfig(display, attributes, 0, configs, 0, configs.size, count, 0) && count[0] > 0) {
-            "Unable to choose EGL config for H.264 codec surface."
+            "Unable to choose a recordable EGL config for H.264 codec surface."
         }
         val config = checkNotNull(configs[0])
+        val recordable = IntArray(1)
+        check(
+            EGL14.eglGetConfigAttrib(display, config, EGLExt.EGL_RECORDABLE_ANDROID, recordable, 0) &&
+                recordable[0] == EGL14.EGL_TRUE,
+        ) { "Selected EGL config is not recordable for H.264 codec input." }
         val contextAttributes = intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 2, EGL14.EGL_NONE)
         context = EGL14.eglCreateContext(display, config, EGL14.EGL_NO_CONTEXT, contextAttributes, 0)
         check(context != EGL14.EGL_NO_CONTEXT) { "Unable to create OpenGL ES context for codec surface." }
