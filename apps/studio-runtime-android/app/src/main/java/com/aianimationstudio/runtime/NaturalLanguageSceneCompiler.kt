@@ -355,12 +355,12 @@ internal object NativeSupportedSubsetSemanticProbe : NativeSceneSemanticBackend 
         if (useArmenian) {
             if (Regex("(?:սպաս|հանգիստ\\s+(?:մն|կանգ)|անշարժ)").containsMatchIn(lower)) add(NativeSceneConcept.WAIT)
             if (Regex("(?:նստ|նստում)").containsMatchIn(lower)) add(NativeSceneConcept.SIT)
-            if (Regex("(?:ոտքի\\s+կանգն|կանգնում\\s+է)").containsMatchIn(lower)) add(NativeSceneConcept.STAND)
+            if (Regex("(?:ոտքի\\s+կանգն)").containsMatchIn(lower)) add(NativeSceneConcept.STAND)
             if (Regex("(?:զարմ|արձագանք)").containsMatchIn(lower)) add(NativeSceneConcept.REACT)
             if (armenianSpeech.containsMatchIn(lower)) add(NativeSceneConcept.SPEAK, dialogue = quotedDialogue(text))
             if (Regex("(?:քայլ|մոտեն)|(?<![\\p{L}\\p{M}])գնում\\s+է(?![\\p{L}\\p{M}])").containsMatchIn(lower)) add(NativeSceneConcept.WALK_TO, target = "semantic-target")
             if (Regex("(?:վազ|վազում)").containsMatchIn(lower)) add(NativeSceneConcept.RUN_TO, target = "semantic-target")
-            if (Regex("(?:նայ|դիտ)").containsMatchIn(lower)) add(NativeSceneConcept.LOOK_AT, target = "semantic-target")
+            // Generic looking/observing prose remains ambiguous until a stable target identity exists.
             if (Regex("(?:վերցն|վերցնում)").containsMatchIn(lower)) add(NativeSceneConcept.PICK_UP, target = "semantic-target")
             if (Regex("(?:բաց|բացում)").containsMatchIn(lower)) add(NativeSceneConcept.OPEN, target = "semantic-target")
             if (Regex("(?:փակ|փակում)").containsMatchIn(lower)) add(NativeSceneConcept.CLOSE, target = "semantic-target")
@@ -377,12 +377,12 @@ internal object NativeSupportedSubsetSemanticProbe : NativeSceneSemanticBackend 
             if (Regex("\\b(?:say|says|speak|speaks)\\b").containsMatchIn(lower)) add(NativeSceneConcept.SPEAK, dialogue = quotedDialogue(text))
             if (Regex("\\b(?:walk|walks|approach|approaches)\\b").containsMatchIn(lower)) add(NativeSceneConcept.WALK_TO, target = "semantic-target")
             if (Regex("\\b(?:run|runs)\\b").containsMatchIn(lower)) add(NativeSceneConcept.RUN_TO, target = "semantic-target")
-            if (Regex("\\b(?:look at|looks at|watch|watches)\\b").containsMatchIn(lower)) add(NativeSceneConcept.LOOK_AT, target = "semantic-target")
+            // Generic "looks at" prose remains ambiguous until target resolution can prove identity.
             if (Regex("\\b(?:pick up|picks up)\\b").containsMatchIn(lower)) add(NativeSceneConcept.PICK_UP, target = "semantic-target")
             if (Regex("\\b(?:open|opens)\\b").containsMatchIn(lower)) add(NativeSceneConcept.OPEN, target = "semantic-target")
             if (Regex("\\b(?:close|closes)\\b").containsMatchIn(lower)) add(NativeSceneConcept.CLOSE, target = "semantic-target")
             if (Regex("\\b(?:camera|pan|pans|tilt|tilts|dolly|dollies|track|tracks|zoom|zooms)\\b").containsMatchIn(lower)) add(NativeSceneConcept.CAMERA_MOVE)
-            if (Regex("\\b(?:lighting|lights?|illuminates?|brightens?|dims?)\\b").containsMatchIn(lower)) add(NativeSceneConcept.LIGHTING_CHANGE)
+            if (Regex("\\b(?:(?:lighting|lights?).{0,48}(?:change|changes|brighten|brightens|dim|dims|turn on|turns on|turn off|turns off)|illuminates?|brightens?|dims?)\\b").containsMatchIn(lower)) add(NativeSceneConcept.LIGHTING_CHANGE)
             if (Regex("\\b(?:environment|background|weather|set changes?)\\b").containsMatchIn(lower)) add(NativeSceneConcept.ENVIRONMENT_CHANGE)
         }
 
@@ -394,7 +394,7 @@ internal object NativeSupportedSubsetSemanticProbe : NativeSceneSemanticBackend 
             if (Regex("(?:говорит|произносит|скажет)").containsMatchIn(lower)) add(NativeSceneConcept.SPEAK, dialogue = quotedDialogue(text))
             if (Regex("(?:ид[её]т|подходит|шагает)").containsMatchIn(lower)) add(NativeSceneConcept.WALK_TO, target = "semantic-target")
             if (Regex("(?:бежит|побежит)").containsMatchIn(lower)) add(NativeSceneConcept.RUN_TO, target = "semantic-target")
-            if (Regex("(?:смотрит|посмотрит|глядит)").containsMatchIn(lower)) add(NativeSceneConcept.LOOK_AT, target = "semantic-target")
+            // Generic observation remains ambiguous until a concrete scene target can be resolved.
             if (Regex("(?:бер[её]т|поднимает)").containsMatchIn(lower)) add(NativeSceneConcept.PICK_UP, target = "semantic-target")
             if (Regex("(?:открывает|открыть)").containsMatchIn(lower)) add(NativeSceneConcept.OPEN, target = "semantic-target")
             if (Regex("(?:закрывает|закрыть)").containsMatchIn(lower)) add(NativeSceneConcept.CLOSE, target = "semantic-target")
