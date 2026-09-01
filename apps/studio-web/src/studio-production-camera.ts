@@ -82,11 +82,11 @@ function cameraStep(panel: HTMLElement): HTMLElement | null {
   return rows.find((row) => row.textContent?.includes("Camera") === true) ?? null;
 }
 
-function patchPanel(chatId: string): void {
+function patchPanel(chatId: string): boolean {
   const execution = executions.get(chatId);
-  if (execution === undefined) return;
+  if (execution === undefined) return false;
   const panel = document.querySelector<HTMLElement>("[data-runtime-production-status]");
-  if (panel === null) return;
+  if (panel === null) return false;
   panel.dataset.cameraReady = "true";
   const heading = panel.querySelector<HTMLElement>("[data-runtime-production-head] strong");
   if (heading !== null) heading.textContent = "Camera ready for render";
@@ -109,6 +109,7 @@ function patchPanel(chatId: string): void {
   }
   plan.dataset.sourceCommit = execution.sourceCommit;
   plan.textContent = `Camera: ${execution.artifact.keyframes.length} keyframes · ${execution.artifact.visibilitySamples.length} frustum samples · exact continuity · ${execution.sourceCommit.slice(0, 12)}`;
+  return true;
 }
 
 function storeExecution(execution: PersistedCameraExecution, runtime: ProductionRuntime): void {
@@ -158,7 +159,7 @@ function syncActive(): void {
   if (chatId === null) return;
   const job = productionJobForChat(chatId);
   if (job !== undefined) executeCamera(job);
-  patchPanel(chatId);
+  if (!patchPanel(chatId)) window.setTimeout(() => patchPanel(chatId), 0);
 }
 
 function onProduction(event: Event): void {
