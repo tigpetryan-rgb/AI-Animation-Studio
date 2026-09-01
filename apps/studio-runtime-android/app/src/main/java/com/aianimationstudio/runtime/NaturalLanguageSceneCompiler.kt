@@ -301,6 +301,7 @@ internal object NativeSupportedSubsetSemanticProbe : NativeSceneSemanticBackend 
     private val resolution = Regex("(\\d{2,5})\\s*[x×х]\\s*(\\d{2,5})", RegexOption.IGNORE_CASE)
     private val fps = Regex("(\\d{1,3}(?:[.,]\\d+)?)\\s*(?:fps|կադր\\s*/\\s*վրկ|кадр(?:ов)?\\s*/\\s*с)", RegexOption.IGNORE_CASE)
     private val duration = Regex("(\\d{1,5}(?:[.,]\\d+)?)\\s*(?:seconds?|secs?|sec|վայրկյան(?:անոց)?|վրկ|секунд(?:а|ы)?|сек)", RegexOption.IGNORE_CASE)
+    private val armenianSpeech = Regex("(?<![\\p{L}\\p{M}])(?:ասում|խոսում|արտասանում|արտասանել)(?![\\p{L}\\p{M}])")
 
     override fun infer(request: NativeSceneSemanticRequest): NativeSceneSemanticDocument {
         val original = request.originalText
@@ -339,7 +340,7 @@ internal object NativeSupportedSubsetSemanticProbe : NativeSceneSemanticBackend 
                 if (Regex("(?:սպաս|հանգիստ\\s+(?:մն|կանգ)|անշարժ)").containsMatchIn(lower)) add(NativeSceneConcept.WAIT)
                 if (Regex("(?:նստ|նստում)").containsMatchIn(lower)) add(NativeSceneConcept.SIT)
                 if (Regex("(?:զարմ|արձագանք)").containsMatchIn(lower)) add(NativeSceneConcept.REACT)
-                if (Regex("(?:ասում|խոսում|արտասան)").containsMatchIn(lower)) add(NativeSceneConcept.SPEAK, dialogue = quotedDialogue(text))
+                if (armenianSpeech.containsMatchIn(lower)) add(NativeSceneConcept.SPEAK, dialogue = quotedDialogue(text))
                 if (Regex("(?:քայլ|մոտեն|գնում\\s+է)").containsMatchIn(lower)) add(NativeSceneConcept.WALK_TO, target = "semantic-target")
                 if (Regex("(?:վազ|վազում)").containsMatchIn(lower)) add(NativeSceneConcept.RUN_TO, target = "semantic-target")
                 if (Regex("(?:վերցն|վերցնում)").containsMatchIn(lower)) add(NativeSceneConcept.PICK_UP, target = "semantic-target")
