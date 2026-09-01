@@ -218,6 +218,9 @@ internal object NativeMediaCodecExporter {
             publishTrackEnd(NativeEncodedTrack.AUDIO, audioDrain)
         }
 
+        fun canAdvance(track: NativeEncodedTrack): Boolean =
+            interleaver?.canAccept(track) ?: true
+
         fun drainOne(codec: MediaCodec, track: NativeEncodedTrack, state: NativeDrainState): NativeDrainResult {
             if (state.ended) return NativeDrainResult()
             val info = MediaCodec.BufferInfo()
@@ -329,15 +332,23 @@ internal object NativeMediaCodecExporter {
                     if (videoFrameIndex == 0) progressed = feedVideoFrame() || progressed
                     if (audioFramesQueued == 0L) progressed = feedAudioInput() || progressed
                 } else {
-                    progressed = feedVideoFrame() || progressed
-                    progressed = feedAudioInput() || progressed
+                    if (canAdvance(NativeEncodedTrack.VIDEO)) progressed = feedVideoFrame() || progressed
+                    if (canAdvance(NativeEncodedTrack.AUDIO)) progressed = feedAudioInput() || progressed
                 }
 
-                val videoResult = drainOne(videoCodec, NativeEncodedTrack.VIDEO, videoDrain)
+                val videoResult = if (canAdvance(NativeEncodedTrack.VIDEO)) {
+                    drainOne(videoCodec, NativeEncodedTrack.VIDEO, videoDrain)
+                } else {
+                    NativeDrainResult()
+                }
                 progressed = videoResult.progressed || progressed
                 videoResult.packet?.let(::acceptPacket)
 
-                val audioResult = drainOne(audioCodec, NativeEncodedTrack.AUDIO, audioDrain)
+                val audioResult = if (canAdvance(NativeEncodedTrack.AUDIO)) {
+                    drainOne(audioCodec, NativeEncodedTrack.AUDIO, audioDrain)
+                } else {
+                    NativeDrainResult()
+                }
                 progressed = audioResult.progressed || progressed
                 audioResult.packet?.let(::acceptPacket)
 

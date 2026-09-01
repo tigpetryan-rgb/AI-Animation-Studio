@@ -27,6 +27,19 @@ internal class NativeSampleInterleaver(
     private var lastVideoPtsUs: Long? = null
     private var lastAudioPtsUs: Long? = null
 
+    fun canAccept(track: NativeEncodedTrack): Boolean {
+        val ended = when (track) {
+            NativeEncodedTrack.VIDEO -> videoEnded
+            NativeEncodedTrack.AUDIO -> audioEnded
+        }
+        if (ended) return false
+        if (pendingPacketCount() < MAX_PENDING_PACKETS) return true
+        return when (track) {
+            NativeEncodedTrack.VIDEO -> audio.isNotEmpty()
+            NativeEncodedTrack.AUDIO -> video.isNotEmpty()
+        }
+    }
+
     fun offer(packet: NativeEncodedSamplePacket) {
         require(packet.presentationTimeUs >= 0L) { "Encoded sample timestamp must be non-negative." }
         require(packet.data.isNotEmpty()) { "Encoded sample packet must contain bytes." }

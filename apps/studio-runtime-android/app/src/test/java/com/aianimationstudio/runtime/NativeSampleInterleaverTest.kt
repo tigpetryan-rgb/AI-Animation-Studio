@@ -1,6 +1,7 @@
 package com.aianimationstudio.runtime
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -37,6 +38,27 @@ class NativeSampleInterleaverTest {
         assertTrue(interleaver.isComplete())
     }
 
+    @Test
+    fun `exposes bounded backpressure until lagging encoder produces a packet`() {
+        val written = mutableListOf<NativeEncodedSamplePacket>()
+        val interleaver = NativeSampleInterleaver(written::add)
+
+        repeat(8) { index ->
+            assertTrue(interleaver.canAccept(NativeEncodedTrack.VIDEO))
+            interleaver.offer(packet(NativeEncodedTrack.VIDEO, index * 83_333L))
+        }
+
+        assertEquals(8, interleaver.pendingPacketCount())
+        assertFalse(interleaver.canAccept(NativeEncodedTrack.VIDEO))
+        assertTrue(interleaver.canAccept(NativeEncodedTrack.AUDIO))
+
+        interleaver.offer(packet(NativeEncodedTrack.AUDIO, 0L))
+
+        assertTrue(written.isNotEmpty())
+        assertTrue(interleaver.pendingPacketCount() < 8)
+        assertTrue(interleaver.canAccept(NativeEncodedTrack.VIDEO))
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun `rejects backwards timestamps within a track`() {
         val interleaver = NativeSampleInterleaver { }
@@ -45,7 +67,7 @@ class NativeSampleInterleaverTest {
     }
 
     @Test(expected = IllegalStateException::class)
-    fun `fails closed if one encoder outruns the bounded interleave window`() {
+    fun `fails closed if a caller ignores the bounded interleave capacity`() {
         val interleaver = NativeSampleInterleaver { }
         repeat(9) { index ->
             interleaver.offer(packet(NativeEncodedTrack.VIDEO, index.toLong()))
