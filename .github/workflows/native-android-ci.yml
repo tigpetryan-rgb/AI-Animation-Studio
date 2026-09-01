@@ -1,0 +1,75 @@
+name: Native Android CI
+
+on:
+  push:
+    branches: ["m56/**"]
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/studio-runtime-android/**"
+      - ".github/workflows/native-android-ci.yml"
+
+jobs:
+  verify-native-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android 16 platform
+        run: yes | sdkmanager "platforms;android-36"
+
+      - name: Capture canonical source identity
+        run: |
+          SOURCE_SHA="$GITHUB_SHA"
+          SOURCE_DATE="$(git show -s --format=%cI "$SOURCE_SHA")"
+          echo "AISTUDIO_SOURCE_SHA=$SOURCE_SHA" >> "$GITHUB_ENV"
+          echo "AISTUDIO_SOURCE_DATE=$SOURCE_DATE" >> "$GITHUB_ENV"
+
+      - name: Verify native-only runtime boundary
+        run: |
+          if grep -R --line-number --fixed-strings "android.webkit.WebView" apps/studio-runtime-android/app/src/main; then
+            echo "WebView reference found in native runtime source." >&2
+            exit 1
+          fi
+          if grep -R --line-number --fixed-strings "androidx.webkit" apps/studio-runtime-android/app/src/main apps/studio-runtime-android/app/build.gradle.kts; then
+            echo "androidx.webkit reference found in native runtime." >&2
+            exit 1
+          fi
+          if grep -n --fixed-strings "build:web" apps/studio-runtime-android/app/build.gradle.kts; then
+            echo "Studio Web build is still coupled to the native APK." >&2
+            exit 1
+          fi
+
+      - name: Kotlin and Android verification
+        working-directory: apps/studio-runtime-android
+        run: |
+          ./gradlew \
+            :app:testDebugUnitTest \
+            :app:lintDebug \
+            :app:assembleDebug \
+            -PstudioCommitSha="${AISTUDIO_SOURCE_SHA}" \
+            -PstudioSourceDate="${AISTUDIO_SOURCE_DATE}" \
+            -PruntimeVersion="0.2.0-native-ci+${AISTUDIO_SOURCE_SHA:0:12}" \
+            -PruntimeVersionCode="${GITHUB_RUN_NUMBER}" \
+            --no-daemon
+          test -s app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload native Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-native-android-${{ env.AISTUDIO_SOURCE_SHA }}
+          path: apps/studio-runtime-android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
