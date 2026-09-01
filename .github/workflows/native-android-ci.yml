@@ -71,20 +71,34 @@ jobs:
             exit 1
           fi
 
-      - name: Kotlin and Android verification
+      - name: M57 300-case multilingual semantic benchmark
         working-directory: apps/studio-runtime-android
         run: |
           ./gradlew \
             :app:testReleaseUnitTest \
-            :app:lintRelease \
-            :app:assembleRelease \
+            --tests "com.aianimationstudio.runtime.M57MultilingualSemanticBenchmarkTest" \
             -PstudioCommitSha="${AISTUDIO_SOURCE_SHA}" \
             -PstudioSourceDate="${AISTUDIO_SOURCE_DATE}" \
             -PruntimeVersion="0.3.0-m57-ci+${AISTUDIO_SOURCE_SHA:0:12}" \
             -PruntimeVersionCode="${GITHUB_RUN_NUMBER}" \
             --no-daemon
 
+      - name: Kotlin and Android verification
+        working-directory: apps/studio-runtime-android
+        run: |
+          RUNTIME_VERSION="0.3.0-m57-ci+${AISTUDIO_SOURCE_SHA:0:12}"
+          ./gradlew \
+            :app:testReleaseUnitTest \
+            :app:lintRelease \
+            :app:assembleRelease \
+            -PstudioCommitSha="${AISTUDIO_SOURCE_SHA}" \
+            -PstudioSourceDate="${AISTUDIO_SOURCE_DATE}" \
+            -PruntimeVersion="${RUNTIME_VERSION}" \
+            -PruntimeVersionCode="${GITHUB_RUN_NUMBER}" \
+            --no-daemon
+
           APK="app/build/outputs/apk/release/app-release.apk"
+          PROVENANCE="app/build/outputs/apk/release/M57_PROVENANCE.txt"
           test -s "$APK"
 
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
@@ -112,10 +126,38 @@ jobs:
             exit 1
           fi
 
+          APK_SHA256="$(sha256sum "$APK" | awk '{print $1}')"
+          SIGNER_SHA256="$("$APKSIGNER" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
+          test -n "$APK_SHA256"
+          test -n "$SIGNER_SHA256"
+
+          cat > "$PROVENANCE" <<EOF
+          schema_version=1
+          repository=${GITHUB_REPOSITORY}
+          branch=${GITHUB_REF_NAME}
+          source_sha=${AISTUDIO_SOURCE_SHA}
+          source_date=${AISTUDIO_SOURCE_DATE}
+          workflow_name=${GITHUB_WORKFLOW}
+          workflow_run_id=${GITHUB_RUN_ID}
+          workflow_run_number=${GITHUB_RUN_NUMBER}
+          workflow_run_attempt=${GITHUB_RUN_ATTEMPT}
+          runtime_kind=NATIVE_ANDROID_COMPOSE
+          runtime_version=${RUNTIME_VERSION}
+          apk_filename=app-release.apk
+          apk_sha256=${APK_SHA256}
+          signer_certificate_sha256=${SIGNER_SHA256}
+          EOF
+
+          grep -Fx "source_sha=${AISTUDIO_SOURCE_SHA}" "$PROVENANCE"
+          grep -Fx "apk_sha256=${APK_SHA256}" "$PROVENANCE"
+          grep -Fx "signer_certificate_sha256=${SIGNER_SHA256}" "$PROVENANCE"
+
       - name: Upload native Android APK
         uses: actions/upload-artifact@v4
         with:
           name: studio-native-android-${{ env.AISTUDIO_SOURCE_SHA }}
-          path: apps/studio-runtime-android/app/build/outputs/apk/release/app-release.apk
+          path: |
+            apps/studio-runtime-android/app/build/outputs/apk/release/app-release.apk
+            apps/studio-runtime-android/app/build/outputs/apk/release/M57_PROVENANCE.txt
           if-no-files-found: error
           retention-days: 14
