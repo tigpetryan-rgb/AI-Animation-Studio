@@ -2,7 +2,7 @@ name: Native Android CI
 
 on:
   push:
-    branches: ["m56/**"]
+    branches: ["m56/**", "m57/**"]
   pull_request:
     branches: [main]
     paths:
@@ -56,6 +56,21 @@ jobs:
             exit 1
           fi
 
+      - name: Verify no provider secret is packaged in native source
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -R --line-number -E 'sk-[A-Za-z0-9_-]{20,}|AIza[A-Za-z0-9_-]{20,}|anthropic_[A-Za-z0-9_-]{20,}' \
+            apps/studio-runtime-android/app/src/main apps/studio-runtime-android/app/build.gradle.kts; then
+            echo "Provider credential-like literal found in native Android source." >&2
+            exit 1
+          fi
+          if grep -n -E 'buildConfigField\([^,]+,[[:space:]]*"[A-Z0-9_]*(API_KEY|SECRET|TOKEN)[A-Z0-9_]*"' \
+            apps/studio-runtime-android/app/build.gradle.kts; then
+            echo "Provider secret/token BuildConfig field found in native APK configuration." >&2
+            exit 1
+          fi
+
       - name: Kotlin and Android verification
         working-directory: apps/studio-runtime-android
         run: |
@@ -65,7 +80,7 @@ jobs:
             :app:assembleRelease \
             -PstudioCommitSha="${AISTUDIO_SOURCE_SHA}" \
             -PstudioSourceDate="${AISTUDIO_SOURCE_DATE}" \
-            -PruntimeVersion="0.2.0-native-ci+${AISTUDIO_SOURCE_SHA:0:12}" \
+            -PruntimeVersion="0.3.0-m57-ci+${AISTUDIO_SOURCE_SHA:0:12}" \
             -PruntimeVersionCode="${GITHUB_RUN_NUMBER}" \
             --no-daemon
 
@@ -91,6 +106,11 @@ jobs:
               exit 1
             fi
           done
+
+          if unzip -p "$APK" 'classes*.dex' | grep -a -E 'sk-[A-Za-z0-9_-]{20,}|AIza[A-Za-z0-9_-]{20,}|anthropic_[A-Za-z0-9_-]{20,}' >/dev/null; then
+            echo "Built native APK contains a provider credential-like literal." >&2
+            exit 1
+          fi
 
       - name: Upload native Android APK
         uses: actions/upload-artifact@v4
