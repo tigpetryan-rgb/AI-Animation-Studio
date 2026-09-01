@@ -181,27 +181,49 @@ jobs:
           echo "M57_APK_SHA256=$APK_SHA256" >> "$GITHUB_ENV"
           echo "APK SHA-256 checkpoint PASS: $APK_SHA256"
 
-      - name: Extract M57 APK signer certificate SHA-256
+      - name: Capture M57 APK signer certificate metadata
         working-directory: apps/studio-runtime-android
         shell: bash
         run: |
           set -euo pipefail
           APK="app/build/outputs/apk/release/app-release.apk"
+          CERTS_FILE="app/build/outputs/apk/release/M57_SIGNER_CERTS.txt"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
           if [[ -z "$APKSIGNER" ]]; then
             echo "Android SDK apksigner was not found while extracting signer provenance." >&2
             exit 1
           fi
-          CERTS_OUTPUT="$("$APKSIGNER" verify --print-certs "$APK")"
-          SIGNER_SHA256="$(printf '%s\n' "$CERTS_OUTPUT" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
+          "$APKSIGNER" verify --print-certs "$APK" > "$CERTS_FILE"
+          if [[ ! -s "$CERTS_FILE" ]]; then
+            echo "apksigner --print-certs succeeded without producing signer metadata." >&2
+            exit 1
+          fi
+          echo "Signer certificate metadata capture checkpoint PASS."
+
+      - name: Verify M57 signer SHA-256 label
+        working-directory: apps/studio-runtime-android
+        shell: bash
+        run: |
+          set -euo pipefail
+          CERTS_FILE="app/build/outputs/apk/release/M57_SIGNER_CERTS.txt"
+          grep -E '^Signer #1 certificate SHA-256 digest: .+$' "$CERTS_FILE"
+          echo "Signer certificate SHA-256 label checkpoint PASS."
+
+      - name: Parse M57 signer certificate SHA-256
+        working-directory: apps/studio-runtime-android
+        shell: bash
+        run: |
+          set -euo pipefail
+          CERTS_FILE="app/build/outputs/apk/release/M57_SIGNER_CERTS.txt"
+          SIGNER_SHA256="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$CERTS_FILE")"
           if [[ ! "$SIGNER_SHA256" =~ ^[0-9a-fA-F]{64}$ ]]; then
-            echo "Signer certificate SHA-256 extraction did not return a canonical 64-character digest." >&2
-            printf '%s\n' "$CERTS_OUTPUT" >&2
+            echo "Signer certificate SHA-256 parsing did not return exactly one canonical 64-character digest." >&2
+            cat "$CERTS_FILE" >&2
             exit 1
           fi
           SIGNER_SHA256="${SIGNER_SHA256,,}"
           echo "M57_SIGNER_SHA256=$SIGNER_SHA256" >> "$GITHUB_ENV"
-          echo "Signer certificate SHA-256 checkpoint PASS: $SIGNER_SHA256"
+          echo "Signer certificate SHA-256 parse checkpoint PASS: $SIGNER_SHA256"
 
       - name: Write M57 APK provenance manifest
         working-directory: apps/studio-runtime-android
