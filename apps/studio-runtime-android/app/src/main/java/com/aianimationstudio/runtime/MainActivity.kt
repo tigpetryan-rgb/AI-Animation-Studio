@@ -47,6 +47,7 @@ import androidx.media3.common.util.UnstableApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.Locale
 
 private enum class StudioScriptMode { NATURAL_LANGUAGE, DETERMINISTIC }
@@ -71,6 +72,9 @@ class MainActivity : ComponentActivity() {
 private fun NativeStudioApp() {
     val context = LocalContext.current
     val sourceStore = remember(context) { NativeSourceStore(context) }
+    val scenePlanStore = remember(context) {
+        NativeScenePlanStore(File(context.filesDir, "m57/compiled-scene-plan.bin"))
+    }
     val exportScope = rememberCoroutineScope()
     var projectName by rememberSaveable { mutableStateOf("Untitled project") }
     var prompt by rememberSaveable { mutableStateOf("") }
@@ -80,6 +84,7 @@ private fun NativeStudioApp() {
     var referenceError by remember { mutableStateOf<String?>(null) }
     var restoringReference by remember { mutableStateOf(true) }
     var productionSnapshot by remember { mutableStateOf<NativeProductionSnapshot?>(null) }
+    var persistedPlanSha by remember { mutableStateOf<String?>(null) }
     var exportPreflight by remember { mutableStateOf<NativeExportReadinessResult?>(null) }
     var exportResult by remember { mutableStateOf<NativeExportPipelineResult?>(null) }
     var exportRunning by remember { mutableStateOf(false) }
@@ -92,6 +97,7 @@ private fun NativeStudioApp() {
             // Persistence of the provider URI is optional because production owns a private byte-for-byte copy.
         }
         productionSnapshot = null
+        persistedPlanSha = null
         pendingImportUri = uri
     }
 
@@ -107,6 +113,7 @@ private fun NativeStudioApp() {
             .onSuccess {
                 reference = it
                 productionSnapshot = null
+                persistedPlanSha = null
                 pendingImportUri = null
             }
             .onFailure {
@@ -115,9 +122,57 @@ private fun NativeStudioApp() {
             }
     }
 
+    LaunchedEffect(reference?.sha256, prompt, scriptMode, restoringReference, pendingImportUri, productionSnapshot) {
+        val exactReference = reference
+        if (
+            productionSnapshot == null &&
+            scriptMode == StudioScriptMode.NATURAL_LANGUAGE &&
+            exactReference != null &&
+            prompt.isNotBlank() &&
+            !restoringReference &&
+            pendingImportUri == null
+        ) {
+            val persisted = withContext(Dispatchers.IO) {
+                scenePlanStore.restoreVerified(
+                    script = prompt,
+                    referenceSha256 = exactReference.sha256,
+                    sourceCommit = BuildConfig.STUDIO_COMMIT_SHA,
+                )
+            }
+            if (persisted != null) {
+                persistedPlanSha = persisted.payloadSha256
+                productionSnapshot = withContext(Dispatchers.Default) {
+                    NativeCompiledSceneRuntime.prepareVerified(
+                        chatId = projectName,
+                        prompt = prompt,
+                        reference = exactReference,
+                        sourceCommit = BuildConfig.STUDIO_COMMIT_SHA,
+                        persisted = persisted,
+                    )
+                }
+            }
+        }
+    }
+
     LaunchedEffect(productionSnapshot) {
         exportResult = null
         val snapshot = productionSnapshot
+        if (
+            snapshot != null &&
+            snapshot.stage == NativeProductionStage.READY_FOR_RENDER &&
+            snapshot.sceneSemanticStatus == NativeSceneSemanticStatus.VALID_EXECUTABLE &&
+            snapshot.sceneIr != null &&
+            snapshot.sceneTimeline != null
+        ) {
+            persistedPlanSha = runCatching {
+                withContext(Dispatchers.IO) {
+                    scenePlanStore.persist(snapshot.sceneIr, snapshot.sceneTimeline)
+                }
+            }.getOrNull()
+        } else if (snapshot?.sceneSemanticStatus != null) {
+            withContext(Dispatchers.IO) { scenePlanStore.clear() }
+            persistedPlanSha = null
+        }
         exportPreflight = if (snapshot == null) {
             null
         } else {
@@ -211,6 +266,7 @@ private fun NativeStudioApp() {
                     onValueChange = {
                         prompt = it
                         productionSnapshot = null
+                        persistedPlanSha = null
                     },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !exportRunning,
@@ -219,7 +275,7 @@ private fun NativeStudioApp() {
                 )
                 Text(
                     if (scriptMode == StudioScriptMode.NATURAL_LANGUAGE) {
-                        "Armenian/English/Russian Scene IR boundary is fail-closed. This APK includes a bounded offline supported-subset semantic probe for deterministic CI/device proof; broad language understanding must use the secure provider-neutral model backend and never an API secret inside the APK. Example: Կերպարը հանգիստ սպասում է 24 վայրկյան։ Ելքը՝ 320×240, 12 կադր/վրկ։"
+                        "Armenian/English/Russian Scene IR boundary is fail-closed. This APK includes a bounded offline supported-subset semantic probe for deterministic CI/device proof; broad language understanding must use the secure provider-neutral server/proxy model backend and never an API secret inside the APK. Example: Կերպարը հանգիստ սպասում է 24 վայրկյան։ Ելքը՝ 320×240, 12 կադր/վրկ։"
                     } else {
                         "Legacy deterministic regression path. Example: ACTOR WAIT 2 seconds 320x240 12 fps."
                     },
@@ -270,7 +326,21 @@ private fun NativeStudioApp() {
                         )
                         ir.warnings.forEach { Text("Warning: $it", style = MaterialTheme.typography.bodySmall) }
                     }
+                    snapshot.sceneTimeline?.let { timeline ->
+                        Text(
+                            "Timeline: ${timeline.shots.size} shot(s) · ${timeline.durationSeconds}s · source ${timeline.sourceCommit}",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text(
+                            "Timeline identity: script ${timeline.scriptSha256} · reference ${timeline.referenceSha256}",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    persistedPlanSha?.let { sha ->
+                        Text("Persisted compiled-plan SHA-256 $sha", style = MaterialTheme.typography.bodySmall)
+                    }
                     Text("Stage: ${snapshot.stage}", fontWeight = FontWeight.SemiBold)
+                    if (snapshot.sceneSemanticStatus != null) GateLine("Scene timeline", snapshot.sceneTimeline != null)
                     GateLine("Blocking", snapshot.blockingReady)
                     GateLine("Performance", snapshot.performanceReady)
                     GateLine("Camera visibility", snapshot.cameraReady)
@@ -403,7 +473,7 @@ private fun StatusCard() {
             .ifBlank { "Android device" }
         Text(device, fontWeight = FontWeight.SemiBold)
         Text("Android ${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}")
-        Text("Source ${BuildConfig.STUDIO_COMMIT_SHA.take(12)}")
+        Text("Source SHA ${BuildConfig.STUDIO_COMMIT_SHA}", style = MaterialTheme.typography.bodySmall)
         Text("Runtime ${BuildConfig.STUDIO_RUNTIME_KIND}")
     }
 }
