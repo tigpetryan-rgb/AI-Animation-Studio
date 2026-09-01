@@ -36,6 +36,7 @@ class NativeProductionCoordinatorTest {
         assertEquals(sourceCommit, snapshot.sourceCommit)
         assertEquals(reference.sha256, snapshot.referenceSha256)
         assertEquals(5, snapshot.camera?.visibilitySamples?.size)
+        assertEquals(null, snapshot.sceneTimeline)
     }
 
     @Test
@@ -59,7 +60,7 @@ class NativeProductionCoordinatorTest {
     }
 
     @Test
-    fun `armenian natural supported subset reaches ready through scene ir bridge`() {
+    fun `armenian natural supported subset reaches ready through scene ir and exact timeline gate`() {
         val source = "Կերպարը հանգիստ սպասում է 24 վայրկյան։ Ելքը՝ 320×240, 12 կադր/վրկ։"
         val snapshot = NativeProductionCoordinator.prepareNaturalLanguage(
             chatId = "armenian-physical-proof",
@@ -79,7 +80,15 @@ class NativeProductionCoordinatorTest {
         assertEquals(240, snapshot.blocking?.output?.height)
         assertEquals(12.0, snapshot.blocking?.output?.frameRate ?: 0.0, 0.0)
         assertEquals(24.0, snapshot.blocking?.output?.durationSeconds ?: 0.0, 0.0)
-        assertTrue(snapshot.sceneIr?.scriptSha256?.length == 64)
+        val sceneIr = requireNotNull(snapshot.sceneIr)
+        val timeline = requireNotNull(snapshot.sceneTimeline)
+        assertEquals(64, sceneIr.scriptSha256.length)
+        assertEquals(sourceCommit, timeline.sourceCommit)
+        assertEquals(reference.sha256, timeline.referenceSha256)
+        assertEquals(sceneIr.scriptSha256, timeline.scriptSha256)
+        assertEquals(24.0, timeline.durationSeconds, 0.0)
+        assertEquals(1, timeline.shots.size)
+        assertEquals(sceneIr.actions.map { it.id }, timeline.shots.single().actionIds)
     }
 
     @Test
@@ -96,6 +105,25 @@ class NativeProductionCoordinatorTest {
         assertEquals(NativeProductionStage.BLOCKING_VALID, snapshot.stage)
         assertFalse(snapshot.performanceReady)
         assertFalse(snapshot.cameraReady)
+        assertEquals(null, snapshot.sceneTimeline)
+        assertTrue(snapshot.diagnostics.any { it.code == "UNSUPPORTED_CAPABILITY" })
+    }
+
+    @Test
+    fun `mixed natural unsupported intent does not bypass timeline or capability gate`() {
+        val snapshot = NativeProductionCoordinator.prepareNaturalLanguage(
+            chatId = "mixed-unsupported",
+            prompt = "Կերպարը հանգիստ սպասում է, then opens the door for 20 seconds.",
+            reference = reference,
+            sourceCommit = sourceCommit,
+            backend = NativeSupportedSubsetSemanticProbe,
+        )
+
+        assertEquals(NativeSceneSemanticStatus.VALID_BUT_UNSUPPORTED_CAPABILITY, snapshot.sceneSemanticStatus)
+        assertEquals(NativeSceneLanguage.MIXED, snapshot.sceneIr?.detectedLanguage)
+        assertEquals(NativeProductionStage.BLOCKING_VALID, snapshot.stage)
+        assertEquals(null, snapshot.sceneTimeline)
+        assertFalse(snapshot.performanceReady)
         assertTrue(snapshot.diagnostics.any { it.code == "UNSUPPORTED_CAPABILITY" })
     }
 
@@ -126,6 +154,7 @@ class NativeProductionCoordinatorTest {
         assertTrue(snapshot.performance == null)
         assertTrue(snapshot.diagnostics.any { it.code == "STORY_UNKNOWN_ACTOR" })
         assertEquals(null, snapshot.sceneSemanticStatus)
+        assertEquals(null, snapshot.sceneTimeline)
     }
 
     @Test
