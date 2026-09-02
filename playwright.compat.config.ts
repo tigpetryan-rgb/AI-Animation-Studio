@@ -1,5 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
+// Legacy browser compatibility matrix. Informational/non-production unless the canonical plan explicitly changes.
 export default defineConfig({
   testDir: "./tests/browser",
   testMatch: "**/studio-compatibility.pw.ts",
@@ -13,27 +14,15 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "npm run preview:web",
+    command: "npm run legacy:web:preview",
     url: "http://127.0.0.1:4173",
     reuseExistingServer: false,
     timeout: 120_000,
   },
   projects: [
-    {
-      name: "chromium-android-emulation",
-      use: { ...devices["Pixel 7"] },
-    },
-    {
-      name: "firefox-desktop",
-      use: { ...devices["Desktop Firefox"] },
-    },
-    {
-      name: "webkit-desktop",
-      use: { ...devices["Desktop Safari"] },
-    },
-    {
-      name: "webkit-ios-emulation",
-      use: { ...devices["iPhone 13"] },
-    },
+    { name: "legacy-chromium-android-emulation", use: { ...devices["Pixel 7"] } },
+    { name: "legacy-firefox-desktop", use: { ...devices["Desktop Firefox"] } },
+    { name: "legacy-webkit-desktop", use: { ...devices["Desktop Safari"] } },
+    { name: "legacy-webkit-ios-emulation", use: { ...devices["iPhone 13"] } },
   ],
 });

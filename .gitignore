@@ -12,7 +12,7 @@ Thumbs.db
 .cache/
 release/
 
-# M55 Android Runtime local/generated state
+# Native Android runtime local/generated state
 apps/studio-runtime-android/.gradle/
 apps/studio-runtime-android/**/build/
 apps/studio-runtime-android/local.properties

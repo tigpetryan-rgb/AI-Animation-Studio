@@ -20,7 +20,9 @@ if (!sha40.matches(studioCommitSha.get())) {
 
 fun quotedBuildConfig(value: String): String = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
-val m55UpdateKeystore = rootProject.file("keystore/m55-update-debug.jks")
+// Historical filename retained only to preserve the stable CI/development update identity.
+// It is not a production/public signing key and does not imply that M55/WebView is current.
+val developmentUpdateKeystore = rootProject.file("keystore/m55-update-debug.jks")
 
 android {
     namespace = "com.aianimationstudio.runtime"
@@ -28,7 +30,7 @@ android {
 
     signingConfigs {
         getByName("debug") {
-            storeFile = m55UpdateKeystore
+            storeFile = developmentUpdateKeystore
             storePassword = "m55devupdate"
             keyAlias = "m55-dev-update"
             keyPassword = "m55devupdate"
@@ -60,8 +62,8 @@ android {
 
     buildTypes {
         release {
-            // Device-proof artifacts are production-like R8 builds. Dead AndroidX helpers such as
-            // LinkifyCompat.findAddress() must not survive into the browser-free native APK.
+            // Device-proof artifacts are production-like R8 builds. Final public signing is a
+            // separate Phase 11 concern and must use a protected key outside this repository.
             isMinifyEnabled = true
             signingConfig = signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -74,8 +76,6 @@ kotlin {
 }
 
 dependencies {
-    // Keep the M56 native rewrite on the stable Compose generation that supports
-    // the existing Android 16 / compileSdk 36 / AGP 8.13 toolchain.
     val composeBom = platform("androidx.compose:compose-bom:2026.02.01")
     implementation(composeBom)
     androidTestImplementation(composeBom)
@@ -86,7 +86,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
 
-    // In-app MP4 muxer supports the production H.264 + Opus MP4 contract.
+    // In-app MP4 muxer supports the native H.264 + Opus MP4 production contract.
     implementation("androidx.media3:media3-muxer:1.11.0")
 
     testImplementation("junit:junit:4.13.2")

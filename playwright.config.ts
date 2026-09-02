@@ -1,5 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
+// Legacy browser compatibility configuration. This is not a production release gate.
 export default defineConfig({
   testDir: "./tests/browser",
   testMatch: "**/*.pw.ts",
@@ -13,14 +14,14 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "npm run preview:web",
+    command: "npm run legacy:web:preview",
     url: "http://127.0.0.1:4173",
     reuseExistingServer: false,
     timeout: 120_000,
   },
   projects: [
     {
-      name: "chromium",
+      name: "legacy-chromium",
       use: { ...devices["Desktop Chrome"] },
     },
   ],

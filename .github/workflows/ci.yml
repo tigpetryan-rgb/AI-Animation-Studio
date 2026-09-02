@@ -7,7 +7,7 @@ on:
     branches: [main, "m51-53/production-validation", "m54/physical-device-export-evidence"]
 
 jobs:
-  verify:
+  verify-foundation:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -43,91 +43,43 @@ jobs:
           SOURCE_DATE="$(git show -s --format=%cI "${SOURCE_SHA}")"
           echo "AISTUDIO_SOURCE_SHA=${SOURCE_SHA}" >> "$GITHUB_ENV"
           echo "AISTUDIO_SOURCE_DATE=${SOURCE_DATE}" >> "$GITHUB_ENV"
-          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "${SOURCE_SHA}")" >> "$GITHUB_ENV"
 
-      - name: Typecheck
+      - name: Typecheck retained foundation
         run: npm run typecheck
 
-      - name: Test
+      - name: Unit tests retained foundation
         run: npm test
 
-      - name: Build Studio Web
-        run: npm run build:web
-
-      - name: Build Android controlled runtime
+      - name: Native Android debug compile checkpoint
         working-directory: apps/studio-runtime-android
         run: |
           ./gradlew :app:assembleDebug \
             -PstudioCommitSha="${AISTUDIO_SOURCE_SHA}" \
             -PstudioSourceDate="${AISTUDIO_SOURCE_DATE}" \
-            -PruntimeVersion="0.1.0-ci+${AISTUDIO_SOURCE_SHA:0:12}" \
+            -PruntimeVersion="0.4.0-m58-foundation+${AISTUDIO_SOURCE_SHA:0:12}" \
             -PruntimeVersionCode="${GITHUB_RUN_NUMBER}" \
             --no-daemon
           test -s app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Upload Android runtime artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: studio-runtime-android-${{ env.AISTUDIO_SOURCE_SHA }}
-          path: apps/studio-runtime-android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 14
+      - name: Legacy Studio Web compatibility build (non-production)
+        continue-on-error: true
+        run: npm run legacy:web:build
 
-      - name: Install Playwright browsers
+      - name: Install legacy browser test engines (non-production)
+        continue-on-error: true
         run: npx playwright install --with-deps chromium firefox webkit
 
-      - name: Chromium browser smoke and export stress
-        shell: bash
+      - name: Legacy Chromium compatibility smoke (non-production)
+        continue-on-error: true
+        run: npm run legacy:web:test:browser
+
+      - name: Legacy browser compatibility matrix (non-production)
+        continue-on-error: true
+        run: npm run legacy:web:test:compat
+
+      - name: Canonical direction guard
         run: |
-          set -o pipefail
-          npm run test:browser 2>&1 | tee playwright-chromium.log
-
-      - name: Upload Chromium failure diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: chromium-failure-${{ env.AISTUDIO_SOURCE_SHA }}-${{ github.run_attempt }}
-          path: |
-            playwright-chromium.log
-            test-results
-            playwright-report
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Browser compatibility matrix
-        run: npm run test:browser:compat
-
-      - name: Build release candidate package
-        run: |
-          npm run release:manifest
-          bash scripts/package-release-candidate.sh
-
-      - name: Verify release candidate checksum
-        run: |
-          cd release
-          sha256sum -c AI-Animation-Studio-Web-RC.zip.sha256
-
-      - name: Verify extracted release candidate
-        run: |
-          rm -rf /tmp/aistudio-rc-check
-          mkdir -p /tmp/aistudio-rc-check
-          unzip -q release/AI-Animation-Studio-Web-RC.zip -d /tmp/aistudio-rc-check
-          cd /tmp/aistudio-rc-check
-          sha256sum -c studio-web-files.sha256
-          test -f studio-web/index.html
-          test -f studio-web/sw.js
-          node -e 'const fs=require("fs"); const m=JSON.parse(fs.readFileSync("studio-web-release-manifest.json","utf8")); if(m.source.commit!==process.env.AISTUDIO_SOURCE_SHA){throw new Error(`Manifest source mismatch: ${m.source.commit} != ${process.env.AISTUDIO_SOURCE_SHA}`)}'
-          grep -q "${AISTUDIO_SOURCE_SHA}" studio-web/assets/*.js
-
-      - name: Upload release candidate artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: studio-web-rc-${{ env.AISTUDIO_SOURCE_SHA }}
-          path: |
-            release/AI-Animation-Studio-Web-RC.zip
-            release/AI-Animation-Studio-Web-RC.zip.sha256
-            release/studio-web-release-manifest.json
-            release/studio-web-files.sha256
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 14
+          grep -q 'native Android' CANONICAL_MASTER_PLAN.md
+          test -f AGENTS.md
+          echo "Foundation CI creates no production Web RC and uploads no release artifact."
+          echo "Native Android CI is the APK/provenance/release gate for the current production path."

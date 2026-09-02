@@ -1,85 +1,73 @@
-# Native Android Studio Runtime — M56/M57
+# Native Android Studio Runtime — M56 → M58
 
-`apps/studio-runtime-android` is the production Android host for AI Animation Studio. The current runtime is **native Jetpack Compose** and intentionally does **not** bundle Studio Web, WebView, JavaScript bridges or browser production state.
+> Current production host for AI Animation Studio. Read repository `/AGENTS.md` and `/CANONICAL_MASTER_PLAN.md` first.
 
-The first certification target remains **POCO X6 Pro 5G / Android 16**. No physical-device PASS is claimed until the final exact-head APK is observed running on that real device and the required evidence is captured.
+`apps/studio-runtime-android` is the **native Jetpack Compose** production runtime. It intentionally does **not** bundle Studio Web, WebView, JavaScript bridges, or browser production state.
+
+Current canonical phase is **M58 / Phase 2**: preserve the verified M57 semantic baseline, bring M58 onto that green base, and make the real 3D mesh/skinning gate RUN + PASS before opening Character Modeling Phase 3.
+
+The primary physical certification target remains **POCO X6 Pro 5G / Android 16** unless the canonical plan is explicitly changed. No final physical-device PASS is claimed until the final exact-head APK is observed on real hardware with matching provenance.
 
 ## Native architecture
 
 The Android production path is source-bound and fail-closed:
 
 1. App-private reference import stores exact source bytes and SHA-256.
-2. M57 natural-language input compiles through a provider-neutral semantic boundary into strict Scene IR v1; deterministic mode remains an explicit regression path.
-3. Executable natural-language Scene IR must preserve exact script SHA-256, reference SHA-256 and 40-character source commit and pass `NativeSceneTimelineCompiler` before production lowering.
-4. Hash-bound compiled Scene IR + timeline may be stored app-privately and restored only when the raw script/reference/build identities still match and the persisted payload SHA-256 verifies.
-5. Deterministic native blocking, performance and camera gates run before rendering.
-6. Native frame rendering uses EGL/OpenGL ES and the exact admitted reference source.
-7. Native export uses H.264 MediaCodec video + Opus MediaCodec audio, bounded MP4 mux/interleave, durable MediaStore save, saved SHA-256 and native decoder verification through EOS.
+2. Natural-language input crosses a provider-neutral semantic boundary into strict Scene IR; deterministic mode remains a regression path.
+3. External semantic JSON is untrusted and must preserve script/reference/source identities and pass strict validation.
+4. Hash-bound Scene IR/timeline persistence restores only when raw input/build identities and payload hashes still match.
+5. Native blocking, performance, camera, 3D character and render gates run before export.
+6. Native rendering uses EGL/OpenGL ES; M58 establishes the real mesh/skeleton/skinning contract and reference-driven reconstruction evidence.
+7. Native export uses H.264 MediaCodec video + Opus MediaCodec audio, bounded MP4 mux/interleave, MediaStore save, saved SHA-256 and native decode-to-EOS verification.
 
-The Compose UI surfaces device/Android identity, exact source SHA, reference SHA-256, semantic status, Scene IR/timeline identity, persisted-plan SHA and MP4 verification evidence.
+## Semantic trust boundary
 
-## M57 semantic trust boundary
+Broad language understanding belongs behind the controlled provider-neutral server/proxy boundary represented by `NativeSceneProxySemanticBackend`. Provider credentials are not accepted by the Android semantic interface and must never be packaged in the APK. Reference image bytes are not sent merely to understand language.
 
-The broad production language mechanism belongs behind the controlled server/proxy boundary represented by `NativeSceneProxySemanticBackend`. Provider API credentials are not accepted by the Android semantic interface and must never be packaged in the APK. The proxy request contains only natural-language scene text plus safe build/reference/actor/request identity; reference image bytes are not sent merely for language understanding.
+`NativeExternalSceneIrV1Adapter` treats proxy/model JSON as untrusted. Duplicate/unknown fields, identity drift, unsupported capabilities, malformed timing, oversized responses and invalid enums fail closed. Understood-but-unexecutable capability remains `UNSUPPORTED_CAPABILITY`; it is never silently dropped.
 
-External model/proxy JSON is parsed by `NativeExternalSceneIrV1Adapter` as untrusted data. Duplicate or unknown fields, identity drift, unsupported enum/capability names, malformed timing and oversized responses are rejected. Semantically understood capabilities that the current renderer cannot execute remain `UNSUPPORTED_CAPABILITY`; they are not silently dropped or converted into fake production readiness.
-
-`BoundedNativeSceneSemanticBackend` supplies timeout, retry, cancellation and response-size bounds. Ordinary CI uses deterministic mocks and the offline supported-subset probe rather than a paid/live provider.
-
-The offline probe supports deterministic Armenian/English/Russian/mixed-language certification of the admitted subset, but it is not advertised as broad language understanding or model parity.
+Ordinary CI uses deterministic mocks/offline supported-subset probes rather than a paid/live provider. The offline Armenian/English/Russian/mixed subset is regression coverage, not a claim of broad model parity.
 
 ## Build
 
-Requirements:
+Requirements: JDK 17, Android SDK/platform 36, and the repository Gradle/AGP toolchain.
 
-- JDK 17
-- Android SDK/platform 36
-- Android Studio compatible with the current AGP/Gradle files
-
-From this directory, an exact-source build passes the source identity explicitly, for example:
+Exact-source release-style verification passes source identity explicitly:
 
 ```bash
 ./gradlew :app:testReleaseUnitTest :app:lintRelease :app:assembleRelease \
   -PstudioCommitSha=<exact-40-char-source-sha> \
   -PstudioSourceDate=<iso-8601-source-date> \
   -PruntimeVersion=<runtime-version> \
-  -PruntimeVersionCode=<integer-version-code>
+  -PruntimeVersionCode=<positive-integer>
 ```
 
-A build with missing/development source identity is not acceptable final certification evidence.
+A missing/development source identity is not final certification evidence.
 
 ## CI and APK provenance
 
-`Native Android CI` is a release gate, not merely a compile job. For the exact workflow source SHA it requires:
+`Native Android CI` is the authoritative native APK/provenance gate. Foundation CI verifies retained shared foundations and a native compile checkpoint; legacy browser checks are compatibility-only and do not define release readiness.
 
-- native-only source boundary (no `android.webkit`, AndroidX WebKit, legacy WebView bridge or coupled Studio Web build);
-- no provider credential-like literals in source;
-- M57 300-case multilingual semantic benchmark;
+For the exact workflow source SHA, Native Android CI requires:
+
+- native-only runtime boundary: no `android.webkit`, AndroidX WebKit, legacy WebView bridge, or coupled Studio Web build;
+- no provider credential-like literal in source or APK;
+- M57 multilingual semantic benchmark;
+- M58 real 3D mesh/skinning gate;
 - release unit tests, lint and release APK assembly;
-- release APK existence and Android signature verification;
+- APK existence and Android signature verification;
 - exact workflow source SHA embedded in APK bytecode;
 - browser/WebView-free release bytecode;
-- no provider credential-like literals in APK bytecode;
-- APK SHA-256;
-- signer-certificate SHA-256 from the actual Android build-tools `apksigner` output;
-- provenance manifest binding source/build/workflow/APK/signer identities;
-- exact artifact upload containing both `app-release.apk` and `M57_PROVENANCE.txt`.
+- APK SHA-256 and signer-certificate SHA-256;
+- provenance binding source/build/workflow/APK/signer identities;
+- artifact upload containing `app-release.apk` and `M58_PROVENANCE.txt`.
 
-A final APK is authoritative only when it comes from the same final exact head whose required Foundation CI and Native Android CI are both fully green. Historical APKs are never promoted merely because their own build succeeded.
+A final APK is authoritative only when it comes from the same final exact head whose required Foundation CI and Native Android CI are both fully green. Historical/debug APKs are never promoted merely because they built successfully.
 
-## Real POCO physical proof
+## Physical proof and Golden Movie
 
-Final M57 proof must use the exact final APK on a **real POCO X6 Pro 5G running Android 16**. Emulator/simulator/browser automation is not physical evidence.
+Final certification must use the exact final APK on real target hardware. Emulator/simulator/browser automation is not physical evidence.
 
-The device proof must visibly establish, at minimum:
+Physical proof ultimately must cover install/launch, project save/reopen, reference import, Armenian natural-language semantic compile, character/3D/performance/camera/lighting production, native MP4 export, saved SHA-256, decode/playback, long-task behavior and storage/cancellation behavior.
 
-- POCO/device identity and Android 16/API identity in the native app;
-- the full exact source SHA matching the final green CI/provenance artifact;
-- the exact imported reference identity;
-- a real Armenian natural-language scene compile with visible semantic/timeline evidence;
-- fail-closed handling for an unsupported natural-language capability;
-- a supported natural-language subset reaching native production and H.264 + Opus MP4 export;
-- `MP4_READY`, saved MP4 SHA-256, native track/decode verification, and playback of the saved video on the phone;
-- no WebView/browser dependency in the production flow.
-
-Until that observation is captured against the final exact-head artifact, physical proof and final merge readiness remain blocked.
+Project-level final PASS is the canonical **Golden Movie** acceptance test from real reference + natural-language scenario through the full native production chain to a watchable QC-passing MP4 on the real device.
