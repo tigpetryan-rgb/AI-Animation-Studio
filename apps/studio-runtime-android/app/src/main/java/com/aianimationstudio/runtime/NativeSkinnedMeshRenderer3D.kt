@@ -74,9 +74,9 @@ internal data class NativeReferencePalette3D(
         val absX = abs(bindNormal.x)
         val absZ = abs(bindNormal.z)
         val viewIndex = when {
-            absZ >= absX && bindNormal.z < -0.15 && textureViews.size >= 3 -> 2
-            absX > absZ && textureViews.size >= 2 -> 1
-            else -> 0
+            absZ >= absX && bindNormal.z < -0.15 && textureViews.size >= 3 -> 2 // back
+            absX > absZ && textureViews.size >= 2 -> 1 // side
+            else -> 0 // front
         }.coerceIn(0, textureViews.lastIndex)
         val view = textureViews[viewIndex]
 
@@ -96,6 +96,8 @@ internal data class NativeReferencePalette3D(
         val y = (yFraction * textureBitmap.height).roundToInt().coerceIn(0, textureBitmap.height - 1)
         val sampled = sampleNeighborhood(textureBitmap, x, y)
 
+        // Do not paint sheet background onto the mesh when a coarse silhouette projection lands
+        // just outside the character. Material fallback remains source-derived and deterministic.
         if (colorDistance(sampled, backgroundColor) < 42.0) return fallback
         return blend(fallback, sampled, if (material == NativeMaterialSlot3D.BODY) 0.84 else 0.92)
     }
@@ -467,19 +469,26 @@ internal object NativeSkinnedMeshRenderer3D {
         val rx = Math.toRadians(rotation.x)
         val ry = Math.toRadians(rotation.y)
         val rz = Math.toRadians(rotation.z)
+
         val cx = cos(rx)
         val sx = sin(rx)
         val x1 = point.x
         val y1 = point.y * cx - point.z * sx
         val z1 = point.y * sx + point.z * cx
+
         val cy = cos(ry)
         val sy = sin(ry)
         val x2 = x1 * cy + z1 * sy
         val y2 = y1
         val z2 = -x1 * sy + z1 * cy
+
         val cz = cos(rz)
         val sz = sin(rz)
-        return NativeStagePoint(x2 * cz - y2 * sz, x2 * sz + y2 * cz, z2)
+        return NativeStagePoint(
+            x = x2 * cz - y2 * sz,
+            y = x2 * sz + y2 * cz,
+            z = z2,
+        )
     }
 
     private fun shadeColor(color: Int, shade: Double): Int = Color.rgb(
@@ -491,15 +500,21 @@ internal object NativeSkinnedMeshRenderer3D {
     private fun lerp(left: Double, right: Double, amount: Double): Double = left + (right - left) * amount
 
     private fun lerp(left: NativeStagePoint, right: NativeStagePoint, amount: Double) = NativeStagePoint(
-        lerp(left.x, right.x, amount), lerp(left.y, right.y, amount), lerp(left.z, right.z, amount),
+        lerp(left.x, right.x, amount),
+        lerp(left.y, right.y, amount),
+        lerp(left.z, right.z, amount),
     )
 
     private fun add(left: NativeStagePoint, right: NativeStagePoint) = NativeStagePoint(
-        left.x + right.x, left.y + right.y, left.z + right.z,
+        left.x + right.x,
+        left.y + right.y,
+        left.z + right.z,
     )
 
     private fun sub(left: NativeStagePoint, right: NativeStagePoint) = NativeStagePoint(
-        left.x - right.x, left.y - right.y, left.z - right.z,
+        left.x - right.x,
+        left.y - right.y,
+        left.z - right.z,
     )
 
     private fun dot(left: NativeStagePoint, right: NativeStagePoint): Double =
