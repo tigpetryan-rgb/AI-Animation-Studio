@@ -1,38 +1,66 @@
-# AI Animation Studio
+# AI Animation Studio / «Վիդեոստուդիա»
 
-A universal browser-first, local-first movie production system.
+> ## ⛔ MANDATORY BEFORE ANY WORK
+>
+> Every new chat/agent/coding session must first read:
+>
+> 1. **[`AGENTS.md`](./AGENTS.md)** — mandatory operating contract
+> 2. **[`CANONICAL_MASTER_PLAN.md`](./CANONICAL_MASTER_PLAN.md)** — single canonical execution plan
+>
+> Do **not** make code, CI, branch, release, or architecture decisions before reading them.
 
-> **AI Animation Studio — universal browser application. Fully offline, local-first, no mandatory API, no subscription, no mandatory server, no APK, no mandatory discrete GPU.**
+## Current production direction
 
-## Architecture constitution
+The canonical production direction is **native Android AI Animation Studio**.
 
-1. Project State is the source of truth.
+Canonical chain:
+
+**Natural language / screenplay → semantic interpretation → strict Scene/Story IR → validation → canonical state → character/world → actor performance/blocking/IK → virtual director/camera/lighting → native render → audio/media → MP4 → QC/repair → physical-device verification.**
+
+Core law:
+
+> **AI proposes. Engines execute. Validators verify. Canonical state decides. Human can override.**
+
+## Current mandatory phase
+
+At the time the canonical plan was introduced, the next mandatory phase is:
+
+**PHASE 2 — bring `m58/native-3d-character-runtime` onto the latest verified M57 green base and make the real M58 3D mesh/skinning gate RUN + PASS.**
+
+The exact branch/SHA/CI facts must always be re-verified live before work.
+
+## Historical architecture warning
+
+This repository contains substantial historical browser/PWA/WebView code, tests, documents, and milestones. They remain valuable as implementation history, compatibility evidence, and reusable subsystem code, but they **do not define the final production runtime anymore**.
+
+The following are no longer primary production directions unless the user explicitly changes the canonical plan:
+
+- Browser/PWA/WebKit/Chromium as final runtime
+- M55 WebView Controlled Runtime as final Android architecture
+- PR #49 WebView line as production future
+- a large multilingual LLM packaged inside the APK as the primary semantic architecture
+- Runway/PixVerse/other proprietary cloud generators as core runtime dependencies
+
+## Architecture constitution retained from the original Design Freeze
+
+1. Canonical Project State is the source of truth.
 2. Pixels are outputs, not truth.
 3. AI proposes; it never silently mutates canonical state.
 4. Human locks always win.
 5. Deterministic code is preferred for deterministic problems.
-6. Character appearance, performance, camera, and lighting are independent layers.
-7. Every expensive operation must be cacheable.
-8. Cache must be disposable.
+6. Character appearance, actor performance, camera, lighting, and world state are explicit independent layers.
+7. Every expensive operation should be cacheable where practical.
+8. Cache is disposable and is not canonical state.
 9. Story events produce explicit state transitions.
-10. Definitions and runtime instances are separate.
+10. Definitions and runtime instances remain separate.
 11. Project formats must survive Studio upgrades through migrations.
-12. Autonomous actions must be traceable and reversible.
+12. Autonomous actions must be traceable, validated, and reversible where practical.
 
-## Foundation milestones
+## Canonical references
 
-- **M0 — Movie State Engine:** stable IDs, rational time, canonical state, commands/events/reducers, persistence contracts.
-- **M1 — Virtual Rehearsal:** proxy stage, actors, props, camera, paths, performance, IK/contact.
-- **M2 — Media Production:** timeline, composition, media, audio, render/export.
-- **M3 — Local AI Production:** local model runtime, generation adapters, vision QC, repair.
+- Repository execution plan: [`CANONICAL_MASTER_PLAN.md`](./CANONICAL_MASTER_PLAN.md)
+- Repository agent contract: [`AGENTS.md`](./AGENTS.md)
+- Persistent Google Drive plan mirror: https://docs.google.com/document/d/1fBywdZl3_D7YEGp76Eivb-zB2ACnmh77GO2KCf7uWpE/edit
+- Research/benchmark library: https://drive.google.com/drive/folders/1aJihdEbWRN2s3nSQ4bmjBSr4FNKzi5nK
 
-## Technology direction
-
-- TypeScript: domain/application logic and browser orchestration
-- Rust → WebAssembly: performance-critical deterministic kernels when benchmarks justify it
-- WGSL/WebGPU: GPU rendering/compute
-- SQLite-WASM + OPFS: live local workspace/index
-- JSON/JSONL + binary assets: portable `.aistudio` Movie Source
-- WebCodecs where supported, WASM fallback
-
-The repository starts with **Foundation M0**. AI generation is deliberately not the first dependency; it will be added on top of a tested movie-state kernel.
+If historical documentation conflicts with the canonical plan, **the canonical plan governs product direction; live GitHub governs current branch/SHA/CI/code facts.**
