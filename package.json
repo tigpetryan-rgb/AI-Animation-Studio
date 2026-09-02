@@ -8,15 +8,16 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "tsc -b && npm run build:web",
-    "build:web": "vite build apps/studio-web",
-    "preview:web": "vite preview apps/studio-web --host 127.0.0.1 --port 4173",
+    "build": "npm run build:foundation",
+    "build:foundation": "tsc -b",
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run",
-    "test:browser": "playwright test",
     "test:watch": "vitest",
-    "release:manifest": "node scripts/create-release-manifest.mjs",
-    "package:rc": "npm run build:web && npm run release:manifest && bash scripts/package-release-candidate.sh"
+    "legacy:web:build": "vite build apps/studio-web",
+    "legacy:web:preview": "vite preview apps/studio-web --host 127.0.0.1 --port 4173",
+    "legacy:web:test:browser": "playwright test",
+    "legacy:web:manifest": "AISTUDIO_ALLOW_LEGACY_WEB_PACKAGE=1 node scripts/create-release-manifest.mjs",
+    "legacy:web:package": "npm run legacy:web:build && npm run legacy:web:manifest && AISTUDIO_ALLOW_LEGACY_WEB_PACKAGE=1 bash scripts/package-release-candidate.sh"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
