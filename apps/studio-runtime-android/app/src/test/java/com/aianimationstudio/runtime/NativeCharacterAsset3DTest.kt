@@ -3,7 +3,6 @@ package com.aianimationstudio.runtime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -85,8 +84,7 @@ class NativeCharacterAsset3DTest {
             assertTrue(file.isFile)
             assertTrue(file.length() > 0L)
 
-            val restored = assertNotNull(store.restoreVerified(asset.actorId, referenceSha, sourceSha))
-            requireNotNull(restored)
+            val restored = requireNotNull(store.restoreVerified(asset.actorId, referenceSha, sourceSha))
             assertEquals(persistedDigest, restored.payloadSha256)
             assertEquals(asset.assetId, restored.asset.assetId)
             assertEquals(asset.actorId, restored.asset.actorId)
