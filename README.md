@@ -23,11 +23,20 @@ Core law:
 
 ## Current mandatory phase
 
-At the time the canonical plan was introduced, the next mandatory phase is:
+**PHASE 3 — CHARACTER RECONSTRUCTION / MODELING.**
 
-**PHASE 2 — bring `m58/native-3d-character-runtime` onto the latest verified M57 green base and make the real M58 3D mesh/skinning gate RUN + PASS.**
+Phase 2 is proven complete at the latest recorded checkpoint:
 
-The exact branch/SHA/CI facts must always be re-verified live before work.
+- branch: `m58/native-3d-character-runtime`
+- exact SHA: `833883efec3d86014943f5e35ed92494462ec1d5`
+- Foundation CI #320: SUCCESS
+- Native Android CI #79: SUCCESS
+- M57 300-case multilingual semantic benchmark: SUCCESS
+- M58 real 3D mesh and skinning gate: SUCCESS
+
+Current Phase-3 objective is to turn real reference image(s) into a reusable, saved/reloadable `CharacterDefinition` / 3D character asset with validated topology, humanoid rig/skeleton mapping, skinning, UV/texture/materials, proportions, acceptable appearance identity/likeness preservation, and stable save/reopen identity.
+
+The exact branch/SHA/CI facts must always be re-verified live before work. Do not start Phase 4 until the Phase-3 DONE gate is proven.
 
 ## Historical architecture warning
 
