@@ -34,15 +34,26 @@ https://docs.google.com/document/d/1fBywdZl3_D7YEGp76Eivb-zB2ACnmh77GO2KCf7uWpE/
 
 ## Current phase
 
-At the time this contract was introduced, the mandatory next production phase is:
+**PHASE 2 IS COMPLETE. PHASE 3 — CHARACTER RECONSTRUCTION / MODELING — IS THE CURRENT MANDATORY PRODUCTION PHASE.**
 
-**PHASE 2 — bring `m58/native-3d-character-runtime` onto the latest verified M57 green base and make the real M58 3D mesh/skinning gate RUN + PASS.**
+Latest verified Phase-2 checkpoint below is historical evidence and MUST be reverified live before relying on it:
 
-Historical checkpoint only; MUST be reverified live:
-- M57 green baseline: `a96d8ee2fc021b5e04558bd3e9a5f9ac30c0d2c8`
-- M58 pre-plan head: `3ab5e0fa7dc3e672b1d630e55190ab74b2910b4b`
+- branch: `m58/native-3d-character-runtime`
+- SHA: `833883efec3d86014943f5e35ed92494462ec1d5`
+- Foundation CI #320: SUCCESS
+- Native Android CI #79: SUCCESS
+- M57 300-case multilingual semantic benchmark: SUCCESS
+- M58 real 3D mesh and skinning gate: SUCCESS
+- exact-head native APK/security/provenance checks: SUCCESS
+- artifact: `studio-native-android-833883efec3d86014943f5e35ed92494462ec1d5`
 
-Do not start Character Modeling Phase 3 until Phase 2's DONE gate is proven.
+Current concrete objective:
+
+**Close reference image(s) → reusable, saved/reloadable `CharacterDefinition` / 3D character asset: mesh/topology, humanoid rig/skeleton mapping, skinning, UV/texture/materials, proportions, acceptable identity/likeness preservation, and stable save/reopen identity.**
+
+The Phase-2 3D gate proves the mesh/skinning foundation; it does **not** by itself prove Phase-3 character reconstruction acceptance.
+
+Do not start Phase 4 Actor Performance until Phase 3's DONE gate is proven.
 
 ## Required session ending
 
