@@ -1,4 +1,4 @@
-# Վիդեոստուդիա — CANONICAL MASTER EXECUTION PLAN — v1
+# Վիդեոստուդիա — CANONICAL MASTER EXECUTION PLAN — v2
 
 > **MANDATORY / DO NOT DEVIATE**
 >
@@ -67,11 +67,14 @@ Historical browser code/tests may remain for compatibility, archaeology, or migr
 - ✅ Native Android export/build foundation.
 - ✅ M57 multilingual natural-language → strict Scene IR architecture.
 - ✅ M57 verified green baseline with Foundation CI and Native Android CI green on the same exact SHA.
+- ✅ M58 inherited M57 semantic benchmark is green on the verified M58 Phase-2 checkpoint.
+- ✅ M58 real 3D mesh and skinning gate RUNS and PASSES on the verified Phase-2 checkpoint.
+- ✅ The same M58 checkpoint verifies native-only source boundary, no packaged provider secret, APK existence/signature, embedded exact source SHA, browser-free bytecode, APK SHA-256 and provenance source/APK/signer bindings.
 
 ## 5. Exists but is not production-final
 
-- ⚠️ Character identity/reference-driven modeling.
-- ⚠️ Real 3D mesh, skeleton, skinning, materials, likeness preservation.
+- ⚠️ Character identity/reference-driven modeling beyond the Phase-2 mesh/skinning proof.
+- ⚠️ Production-quality topology, UV/texture/materials, proportions, likeness preservation and saved/reloadable character identity.
 - ⚠️ Face/expression/gaze/hands/fingers.
 - ⚠️ Actor performance intelligence: blocking, pose, timing, emotion, subtext/microperformance.
 - ⚠️ Motion retargeting, root motion, IK, foot lock, contacts, prop interaction.
@@ -83,8 +86,7 @@ Historical browser code/tests may remain for compatibility, archaeology, or migr
 - ⚠️ Native real-time/offscreen render → encoder → final MP4 production chain.
 - ⚠️ Deterministic QC + repair/self-healing on real rendered scenes.
 - ⚠️ Final Compose Studio workflow/UI.
-- ⚠️ Final artifact provenance/security audit.
-- ⚠️ M58 contains 3D implementation, but its own real 3D gate has not yet reached final green proof.
+- ⚠️ Final release artifact provenance/security audit. The M58 Phase-2 artifact is a strong checkpoint, not the final v1 release candidate.
 
 # 6. ACTIVE MASTER EXECUTION SEQUENCE
 
@@ -108,20 +110,30 @@ Initial verified baseline:
 
 ## PHASE 2 — MOVE M58 ONTO THE M57 GREEN BASE
 
-❌ **This is the current mandatory technical phase.**
+✅ **COMPLETE.**
 
-Actions:
-1. Re-read live M57 and M58 branch heads before writing.
-2. Safely integrate the latest verified M57 green fix/history into `m58/native-3d-character-runtime` without losing M58 3D work.
-3. Run/observe full Foundation CI + Native Android CI on the resulting exact M58 SHA.
+Verified Phase-2 checkpoint:
+- branch: `m58/native-3d-character-runtime`
+- exact SHA: `833883efec3d86014943f5e35ed92494462ec1d5`
+- Foundation CI #320: SUCCESS
+- Native Android CI #79: SUCCESS
+- M57 300-case multilingual semantic benchmark: SUCCESS
+- M58 real 3D mesh and skinning gate: SUCCESS
+- Kotlin and Android verification: SUCCESS
+- native APK signature/source-SHA/browser-free/no-secret checks: SUCCESS
+- provenance source/APK/signer checks: SUCCESS
+- artifact: `studio-native-android-833883efec3d86014943f5e35ed92494462ec1d5`
+- GitHub artifact digest: `sha256:ccc875b6ccd432bf6ee36deabc1fb26ef61423a9cf271d24f86d2e4c7bf21768`
 
-**DONE gate:** inherited M57 benchmark is green **and** M58 real 3D mesh/skinning gate actually RUNS and PASSES (not skipped).
+This supersedes the historical M58 #75/#77 failures and the earlier skipped 3D gate.
 
-Do not open Phase 3 before this gate is proven.
+**DONE gate:** inherited M57 benchmark is green **and** M58 real 3D mesh/skinning gate actually RUNS and PASSES. Proven.
 
 ## PHASE 3 — CHARACTER RECONSTRUCTION / MODELING
 
-❌ Reference image(s) → reusable `CharacterDefinition` / character asset.
+❌ **THIS IS THE CURRENT MANDATORY TECHNICAL PHASE.**
+
+Goal: reference image(s) → reusable, saved/reloadable `CharacterDefinition` / character asset.
 
 Close:
 - mesh/topology
@@ -132,9 +144,13 @@ Close:
 - appearance identity/likeness preservation
 - saved/reloadable asset identity
 
-Research references: Blender, Unreal Engine, MediaPipe, and relevant open/legal technical material.
+The M58 Phase-2 mesh/skinning gate is a foundation proof, not Phase-3 completion. Phase 3 requires a real reference-derived character asset that preserves identity and survives save/reopen.
+
+Research references when needed: Blender, Unreal Engine, MediaPipe, and relevant open/legal technical material.
 
 **DONE gate:** a real reference-derived 3D character preserves acceptable identity, has real rig/skinning, moves without structural breakage, and reopens from the project with the same identity/state.
+
+Do not open Phase 4 before this gate is proven.
 
 ## PHASE 4 — ACTOR PERFORMANCE ENGINE
 
@@ -171,8 +187,6 @@ Close:
 - eyeline and shot continuity
 - one-performance-many-cameras
 - shot selection from story/performance intent
-
-Research references: Unreal virtual production, Blender camera workflows, DaVinci Resolve / After Effects editing and cinematic conventions.
 
 **DONE gate:** the same master performance can produce multiple logical, cinematic, continuity-safe shots without actor/world collision or broken framing.
 
@@ -248,7 +262,7 @@ User flow:
 
 ## PHASE 11 — BUILD / PROVENANCE / SECURITY GATES
 
-❌ Bind every release candidate to one exact source SHA.
+❌ Bind every final release candidate to one exact source SHA.
 
 Mandatory:
 - Foundation CI green
@@ -261,7 +275,7 @@ Mandatory:
 - browser-free runtime boundary verified
 - provider secret absent
 
-**DONE gate:** one exact SHA → one proven APK/artifact provenance chain.
+**DONE gate:** one final exact SHA → one proven APK/artifact provenance chain.
 
 ## PHASE 12 — PHYSICAL ANDROID CERTIFICATION
 
@@ -358,16 +372,29 @@ Every new chat/agent must:
 
 # 9. LIVE CHECKPOINT RULE
 
-The values below are historical checkpoints only. **Every new chat must re-verify them live before relying on them.**
+The values below are checkpoints, not permission to skip live verification. **Every new chat must re-verify current branch/SHA/CI before relying on them.**
 
-- M57 initial canonical green baseline: `a96d8ee2fc021b5e04558bd3e9a5f9ac30c0d2c8`
+Historical M57 baseline:
+- `a96d8ee2fc021b5e04558bd3e9a5f9ac30c0d2c8`
 - Foundation CI #313: SUCCESS
 - Native Android CI #74: SUCCESS
-- M58 initial known head before canonical-plan commit: `3ab5e0fa7dc3e672b1d630e55190ab74b2910b4b`
-- M58 Native Android CI #75: FAILURE in inherited M57 300-case semantic benchmark
-- M58 real 3D mesh/skinning gate in that run: SKIPPED
 
-Therefore the first production action remains: **bring the latest verified M57 green fix safely into M58 and reopen real M58 3D verification.**
+Historical M58 failure checkpoint retained for archaeology:
+- `3ab5e0fa7dc3e672b1d630e55190ab74b2910b4b`
+- Native Android CI #75: FAILURE in inherited M57 300-case semantic benchmark
+- M58 real 3D mesh/skinning gate: SKIPPED
+
+Superseding verified Phase-2 checkpoint:
+- `833883efec3d86014943f5e35ed92494462ec1d5`
+- Foundation CI #320: SUCCESS
+- Native Android CI #79: SUCCESS
+- M57 300-case benchmark: SUCCESS
+- M58 real 3D mesh/skinning gate: SUCCESS
+- exact-head APK/security/provenance checks: SUCCESS
+- artifact: `studio-native-android-833883efec3d86014943f5e35ed92494462ec1d5`
+- GitHub artifact digest: `sha256:ccc875b6ccd432bf6ee36deabc1fb26ef61423a9cf271d24f86d2e4c7bf21768`
+
+Therefore the active production action is **Phase 3 Character Reconstruction / Modeling**.
 
 # 10. GOLDEN MOVIE FINAL DEFINITION
 
@@ -405,8 +432,8 @@ When changing the plan:
 
 # 12. ONE-LINE CANONICAL PATH
 
-**✅ Foundation → ✅ Native M56 → ✅ Semantic M57 → ❌ M58 green 3D → ❌ Character Modeling → ❌ Actor Performance → ❌ Virtual Director/Camera → ❌ Lighting/World → ❌ Full Orchestration → ❌ Native Render/Media → ❌ QC/Repair → ❌ Final Studio UI → ❌ Provenance/Security → ❌ Physical Android Certification → ❌ Golden Movie → ❌ v1.0**
+**✅ Foundation → ✅ Native M56 → ✅ Semantic M57 → ✅ M58 green 3D → ❌ Character Modeling → ❌ Actor Performance → ❌ Virtual Director/Camera → ❌ Lighting/World → ❌ Full Orchestration → ❌ Native Render/Media → ❌ QC/Repair → ❌ Final Studio UI → ❌ Final Provenance/Security → ❌ Physical Android Certification → ❌ Golden Movie → ❌ v1.0**
 
 # CURRENT NEXT ACTION
 
-> ❌ **Bring `m58/native-3d-character-runtime` onto the latest verified M57 green base, run the complete required CI, and make the real M58 3D mesh/skinning gate RUN + PASS. Until this closes, do not open the next production phase.**
+> ❌ **PHASE 3 — turn real reference image(s) into a reusable, saved/reloadable `CharacterDefinition` / 3D character asset with validated topology, humanoid rig/skeleton mapping, skinning, UV/texture/materials, proportions, acceptable appearance identity/likeness preservation, and stable save/reopen identity. Do not open Phase 4 until this DONE gate is proven.**
