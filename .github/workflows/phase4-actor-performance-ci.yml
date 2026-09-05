@@ -1,0 +1,58 @@
+name: Phase 4 Actor Performance CI
+
+on:
+  push:
+    branches: ["m58/**"]
+    paths:
+      - "apps/studio-runtime-android/**"
+      - ".github/workflows/phase4-actor-performance-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/studio-runtime-android/**"
+      - ".github/workflows/phase4-actor-performance-ci.yml"
+
+jobs:
+  verify-phase4-actor-performance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android 16 platform
+        run: yes | sdkmanager "platforms;android-36"
+
+      - name: Capture exact source identity
+        run: |
+          SOURCE_SHA="$GITHUB_SHA"
+          SOURCE_DATE="$(git show -s --format=%cI "$SOURCE_SHA")"
+          echo "AISTUDIO_SOURCE_SHA=$SOURCE_SHA" >> "$GITHUB_ENV"
+          echo "AISTUDIO_SOURCE_DATE=$SOURCE_DATE" >> "$GITHUB_ENV"
+
+      - name: Phase 4 deterministic actor performance gate
+        working-directory: apps/studio-runtime-android
+        run: |
+          ./gradlew \
+            :app:testReleaseUnitTest \
+            --tests "com.aianimationstudio.runtime.NativeActorPerformancePhase4Test" \
+            -PstudioCommitSha="${AISTUDIO_SOURCE_SHA}" \
+            -PstudioSourceDate="${AISTUDIO_SOURCE_DATE}" \
+            -PruntimeVersion="0.6.0-phase4-ci+${AISTUDIO_SOURCE_SHA:0:12}" \
+            -PruntimeVersionCode="${GITHUB_RUN_NUMBER}" \
+            --no-daemon
+
+      - name: Phase 4 contract summary
+        run: |
+          echo "Phase 4 gate PASS on exact SHA ${AISTUDIO_SOURCE_SHA}"
+          echo "Verified: reusable Phase-3 CharacterAsset instantiation, script-driven walk/stop/turn/look/prop pickup+use/reaction sequence, root motion, semantic retargeting, explicit rehearsal-anchor hand/foot contact constraints, layered body/head/face/hands/gaze tracks, emotion/reaction curve, microperformance hooks, deterministic reopen behavior, and bounded continuity validation."
