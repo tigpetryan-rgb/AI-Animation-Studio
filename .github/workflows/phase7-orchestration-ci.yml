@@ -1,0 +1,58 @@
+name: Phase 7 Production Orchestration CI
+
+on:
+  push:
+    branches: ["m58/**"]
+    paths:
+      - "apps/studio-runtime-android/**"
+      - ".github/workflows/phase7-orchestration-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/studio-runtime-android/**"
+      - ".github/workflows/phase7-orchestration-ci.yml"
+
+jobs:
+  verify-phase7-orchestration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android 16 platform
+        run: yes | sdkmanager "platforms;android-36"
+
+      - name: Capture exact source identity
+        run: |
+          SOURCE_SHA="$GITHUB_SHA"
+          SOURCE_DATE="$(git show -s --format=%cI "$SOURCE_SHA")"
+          echo "AISTUDIO_SOURCE_SHA=$SOURCE_SHA" >> "$GITHUB_ENV"
+          echo "AISTUDIO_SOURCE_DATE=$SOURCE_DATE" >> "$GITHUB_ENV"
+
+      - name: Phase 7 natural-language full production orchestration gate
+        working-directory: apps/studio-runtime-android
+        run: |
+          ./gradlew \
+            :app:testReleaseUnitTest \
+            --tests "com.aianimationstudio.runtime.NativeProductionOrchestrationPhase7Test" \
+            -PstudioCommitSha="${AISTUDIO_SOURCE_SHA}" \
+            -PstudioSourceDate="${AISTUDIO_SOURCE_DATE}" \
+            -PruntimeVersion="0.9.0-phase7-ci+${AISTUDIO_SOURCE_SHA:0:12}" \
+            -PruntimeVersionCode="${GITHUB_RUN_NUMBER}" \
+            --no-daemon
+
+      - name: Phase 7 contract summary
+        run: |
+          echo "Phase 7 gate PASS on exact SHA ${AISTUDIO_SOURCE_SHA}"
+          echo "Verified: Armenian natural-language Scene IR directly orchestrates reusable character identity, accepted actor performance, Virtual Director cameras, canonical world/props, world-bound contacts, deterministic lighting, frame-exact production timeline, and an identity-bound render-job DAG without developer-authored internal JSON/state or legacy Scene-IR-to-text lowering."
