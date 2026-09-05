@@ -2,7 +2,6 @@ package com.aianimationstudio.runtime
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Color
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
@@ -28,8 +27,9 @@ internal data class NativeReferenceShapeProfile3D(
 
 /**
  * Extracts coarse multi-view shape evidence from a character/reference sheet without network or
- * model dependencies. It deliberately does not claim learned photogrammetry. The output is used to
- * deform the canonical closed skinned mesh so its width/depth proportions are reference-driven.
+ * model dependencies. It deliberately does not claim learned photogrammetry. PNG references use a
+ * deterministic pure raster path first so the same visual reconstruction logic is executable in
+ * JVM CI and on-device; other admitted image formats retain Android Bitmap fallback.
  */
 internal object NativeReferenceShapeAnalyzer3D {
     private const val SAMPLE_LIMIT = 160
@@ -38,6 +38,11 @@ internal object NativeReferenceShapeAnalyzer3D {
 
     fun analyze(reference: PersistedReferenceAsset): NativeReferenceShapeProfile3D? {
         if (!reference.localFile.isFile || reference.localFile.length() <= 0L) return null
+        val raster = runCatching {
+            NativeReferenceRaster3DDecoder.decode(reference.localFile, reference.mimeType)
+        }.getOrNull()
+        if (raster != null) return analyzeRaster(raster)
+
         val bitmap = BitmapFactory.decodeFile(reference.localFile.absolutePath) ?: return null
         return try {
             analyzeBitmap(bitmap)
@@ -46,30 +51,40 @@ internal object NativeReferenceShapeAnalyzer3D {
         }
     }
 
-    internal fun analyzeBitmap(bitmap: Bitmap): NativeReferenceShapeProfile3D? {
-        if (bitmap.width <= 0 || bitmap.height <= 0) return null
+    internal fun analyzeRaster(raster: NativeReferenceRaster3D): NativeReferenceShapeProfile3D? =
+        analyzePixels(raster.width, raster.height) { x, y -> raster.pixelAt(x, y) }
+
+    internal fun analyzeBitmap(bitmap: Bitmap): NativeReferenceShapeProfile3D? =
+        analyzePixels(bitmap.width, bitmap.height) { x, y -> bitmap.getPixel(x, y) }
+
+    private fun analyzePixels(
+        sourceWidth: Int,
+        sourceHeight: Int,
+        pixelAt: (Int, Int) -> Int,
+    ): NativeReferenceShapeProfile3D? {
+        if (sourceWidth <= 0 || sourceHeight <= 0) return null
         val sampleWidth: Int
         val sampleHeight: Int
-        if (bitmap.width >= bitmap.height) {
-            sampleWidth = min(SAMPLE_LIMIT, bitmap.width)
-            sampleHeight = max(1, (sampleWidth.toDouble() * bitmap.height / bitmap.width).toInt())
+        if (sourceWidth >= sourceHeight) {
+            sampleWidth = min(SAMPLE_LIMIT, sourceWidth)
+            sampleHeight = max(1, (sampleWidth.toDouble() * sourceHeight / sourceWidth).toInt())
         } else {
-            sampleHeight = min(SAMPLE_LIMIT, bitmap.height)
-            sampleWidth = max(1, (sampleHeight.toDouble() * bitmap.width / bitmap.height).toInt())
+            sampleHeight = min(SAMPLE_LIMIT, sourceHeight)
+            sampleWidth = max(1, (sampleHeight.toDouble() * sourceWidth / sourceHeight).toInt())
         }
 
         val pixels = IntArray(sampleWidth * sampleHeight)
         for (y in 0 until sampleHeight) {
-            val sourceY = ((y + 0.5) * bitmap.height / sampleHeight).toInt().coerceIn(0, bitmap.height - 1)
+            val sourceY = ((y + 0.5) * sourceHeight / sampleHeight).toInt().coerceIn(0, sourceHeight - 1)
             for (x in 0 until sampleWidth) {
-                val sourceX = ((x + 0.5) * bitmap.width / sampleWidth).toInt().coerceIn(0, bitmap.width - 1)
-                pixels[y * sampleWidth + x] = bitmap.getPixel(sourceX, sourceY)
+                val sourceX = ((x + 0.5) * sourceWidth / sampleWidth).toInt().coerceIn(0, sourceWidth - 1)
+                pixels[y * sampleWidth + x] = pixelAt(sourceX, sourceY)
             }
         }
 
         val background = dominantColor(pixels)
         val foreground = BooleanArray(pixels.size) { index ->
-            colorDistance(pixels[index], background) >= BACKGROUND_DISTANCE && Color.alpha(pixels[index]) >= 64
+            colorDistance(pixels[index], background) >= BACKGROUND_DISTANCE && alpha(pixels[index]) >= 64
         }
         val components = components(foreground, sampleWidth, sampleHeight)
             .filter { component ->
@@ -188,9 +203,9 @@ internal object NativeReferenceShapeAnalyzer3D {
         data class Bucket(var count: Int = 0, var r: Long = 0, var g: Long = 0, var b: Long = 0)
         val buckets = mutableMapOf<Int, Bucket>()
         pixels.forEach { pixel ->
-            val r = Color.red(pixel)
-            val g = Color.green(pixel)
-            val b = Color.blue(pixel)
+            val r = red(pixel)
+            val g = green(pixel)
+            val b = blue(pixel)
             val key = ((r shr COLOR_BUCKET_SHIFT) shl 6) or
                 ((g shr COLOR_BUCKET_SHIFT) shl 3) or
                 (b shr COLOR_BUCKET_SHIFT)
@@ -200,8 +215,8 @@ internal object NativeReferenceShapeAnalyzer3D {
             bucket.g += g
             bucket.b += b
         }
-        val best = buckets.maxByOrNull { it.value.count }?.value ?: return Color.WHITE
-        return Color.rgb(
+        val best = buckets.maxByOrNull { it.value.count }?.value ?: return rgb(255, 255, 255)
+        return rgb(
             (best.r / best.count).toInt().coerceIn(0, 255),
             (best.g / best.count).toInt().coerceIn(0, 255),
             (best.b / best.count).toInt().coerceIn(0, 255),
@@ -209,11 +224,18 @@ internal object NativeReferenceShapeAnalyzer3D {
     }
 
     private fun colorDistance(left: Int, right: Int): Double {
-        val dr = Color.red(left) - Color.red(right)
-        val dg = Color.green(left) - Color.green(right)
-        val db = Color.blue(left) - Color.blue(right)
+        val dr = red(left) - red(right)
+        val dg = green(left) - green(right)
+        val db = blue(left) - blue(right)
         return sqrt((dr * dr + dg * dg + db * db).toDouble())
     }
+
+    private fun alpha(color: Int): Int = (color ushr 24) and 0xff
+    private fun red(color: Int): Int = (color ushr 16) and 0xff
+    private fun green(color: Int): Int = (color ushr 8) and 0xff
+    private fun blue(color: Int): Int = color and 0xff
+    private fun rgb(r: Int, g: Int, b: Int): Int =
+        (0xff shl 24) or ((r and 0xff) shl 16) or ((g and 0xff) shl 8) or (b and 0xff)
 }
 
 internal object NativeReferenceDrivenCharacterModel3DBuilder {
