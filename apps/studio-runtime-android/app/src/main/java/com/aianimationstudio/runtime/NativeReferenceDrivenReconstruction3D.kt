@@ -104,6 +104,12 @@ internal object NativeReferenceShapeAnalyzer3D {
             )
         }
 
+        // Fractions are normalized independently on X/Y, so widthFraction / heightFraction is
+        // distorted whenever the sampled sheet is not square. Restore pixel-space aspect before
+        // classifying silhouettes or deriving geometry scales.
+        val sampleAspect = sampleWidth.toDouble() / sampleHeight.toDouble()
+        fun pixelAspect(evidence: NativeReferenceViewEvidence3D): Double = evidence.aspect * sampleAspect
+
         // Character sheets commonly place front/side/back isolated views in the upper-right region.
         // Prefer those when present; otherwise use the largest isolated full-body candidate.
         val upperRight = normalized.filter { evidence ->
@@ -118,19 +124,20 @@ internal object NativeReferenceShapeAnalyzer3D {
             upperRight.take(4)
         } else {
             normalized.sortedByDescending { it.foregroundSamples }.take(3)
-        }.filter { it.aspect in 0.18..1.8 }
+        }.filter { pixelAspect(it) in 0.18..1.8 }
 
         if (selected.isEmpty()) return null
         val front = selected.maxByOrNull { it.widthFraction * it.heightFraction } ?: return null
         val side = selected
             .filter { it !== front }
-            .minByOrNull { it.aspect }
+            .minByOrNull { pixelAspect(it) }
 
         // The canonical stylized creature mesh has an overall full-body aspect near 0.72. Keep
         // deformation bounded so noisy sheets cannot create inverted or paper-thin geometry.
-        val widthScale = (front.aspect / 0.72).coerceIn(0.78, 1.24)
+        val frontAspect = pixelAspect(front)
+        val widthScale = (frontAspect / 0.72).coerceIn(0.78, 1.24)
         val depthFromViews = side?.let { candidate ->
-            val ratio = candidate.aspect / front.aspect
+            val ratio = pixelAspect(candidate) / frontAspect
             (ratio * 1.08).coerceIn(0.58, 1.08)
         } ?: 0.82
         val mode = if (upperRight.size >= 2) {
