@@ -40,12 +40,13 @@ jobs:
           echo "AISTUDIO_SOURCE_SHA=$SOURCE_SHA" >> "$GITHUB_ENV"
           echo "AISTUDIO_SOURCE_DATE=$SOURCE_DATE" >> "$GITHUB_ENV"
 
-      - name: Phase 4 deterministic actor performance gate
+      - name: Phase 4 deterministic actor performance and skinned-mesh continuity gate
         working-directory: apps/studio-runtime-android
         run: |
           ./gradlew \
             :app:testReleaseUnitTest \
             --tests "com.aianimationstudio.runtime.NativeActorPerformancePhase4Test" \
+            --tests "com.aianimationstudio.runtime.NativeActorPerformanceMeshGateTest" \
             -PstudioCommitSha="${AISTUDIO_SOURCE_SHA}" \
             -PstudioSourceDate="${AISTUDIO_SOURCE_DATE}" \
             -PruntimeVersion="0.6.0-phase4-ci+${AISTUDIO_SOURCE_SHA:0:12}" \
@@ -55,4 +56,4 @@ jobs:
       - name: Phase 4 contract summary
         run: |
           echo "Phase 4 gate PASS on exact SHA ${AISTUDIO_SOURCE_SHA}"
-          echo "Verified: reusable Phase-3 CharacterAsset instantiation, script-driven walk/stop/turn/look/prop pickup+use/reaction sequence, root motion, semantic retargeting, explicit rehearsal-anchor hand/foot contact constraints, layered body/head/face/hands/gaze tracks, emotion/reaction curve, microperformance hooks, deterministic reopen behavior, and bounded continuity validation."
+          echo "Verified: reusable Phase-3 CharacterAsset instantiation, script-driven walk/stop/turn/look/prop pickup+use/reaction sequence, root motion, semantic retargeting, explicit rehearsal-anchor hand/foot/grasp contact constraints, layered body/head/face/hands/gaze tracks, emotion/reaction curve, microperformance hooks, deterministic reopen behavior, bounded continuity validation, and real skinned Phase-3 mesh deformation that remains finite, volumetric, bounded and continuous across sampled Phase-4 poses."
