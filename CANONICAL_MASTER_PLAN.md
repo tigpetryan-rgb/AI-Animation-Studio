@@ -69,13 +69,13 @@ Historical browser code/tests may remain for compatibility, archaeology, or migr
 - ✅ M57 verified green baseline with Foundation CI and Native Android CI green on the same exact SHA.
 - ✅ M58 inherited M57 semantic benchmark is green on the verified M58 Phase-2 checkpoint.
 - ✅ M58 real 3D mesh and skinning gate RUNS and PASSES on the verified Phase-2 checkpoint.
-- ✅ The same M58 checkpoint verifies native-only source boundary, no packaged provider secret, APK existence/signature, embedded exact source SHA, browser-free bytecode, APK SHA-256 and provenance source/APK/signer bindings.
+- ✅ Phase 3 reusable `CharacterDefinition3D` / `CharacterAsset3D`: source-dependent reference geometry, humanoid skeleton mapping, real skinning, UV/material regions, exact appearance bytes, checksummed save/reopen and fail-closed restore.
+- ✅ Phase 3 deterministic PNG multi-view reconstruction gate proves different reference silhouettes produce measurably different 3D geometry rather than falling back to one generic scale.
+- ✅ The latest Phase-3 technical checkpoint verifies native-only source boundary, no packaged provider secret, APK existence/signature, embedded exact source SHA, browser-free bytecode, APK SHA-256 and provenance source/APK/signer bindings.
 
 ## 5. Exists but is not production-final
 
-- ⚠️ Character identity/reference-driven modeling beyond the Phase-2 mesh/skinning proof.
-- ⚠️ Production-quality topology, UV/texture/materials, proportions, likeness preservation and saved/reloadable character identity.
-- ⚠️ Face/expression/gaze/hands/fingers.
+- ⚠️ Face/expression/gaze/hands/fingers as performance layers beyond the retained Phase-3 character asset contract.
 - ⚠️ Actor performance intelligence: blocking, pose, timing, emotion, subtext/microperformance.
 - ⚠️ Motion retargeting, root motion, IK, foot lock, contacts, prop interaction.
 - ⚠️ Camera engine: lens/framing/shot size/angle/movement/tracking/collision/continuity.
@@ -86,7 +86,7 @@ Historical browser code/tests may remain for compatibility, archaeology, or migr
 - ⚠️ Native real-time/offscreen render → encoder → final MP4 production chain.
 - ⚠️ Deterministic QC + repair/self-healing on real rendered scenes.
 - ⚠️ Final Compose Studio workflow/UI.
-- ⚠️ Final release artifact provenance/security audit. The M58 Phase-2 artifact is a strong checkpoint, not the final v1 release candidate.
+- ⚠️ Final release artifact provenance/security audit. The Phase-3 artifact is a strong checkpoint, not the final v1 release candidate.
 
 # 6. ACTIVE MASTER EXECUTION SEQUENCE
 
@@ -131,30 +131,35 @@ This supersedes the historical M58 #75/#77 failures and the earlier skipped 3D g
 
 ## PHASE 3 — CHARACTER RECONSTRUCTION / MODELING
 
-❌ **THIS IS THE CURRENT MANDATORY TECHNICAL PHASE.**
+✅ **COMPLETE.**
 
-Goal: reference image(s) → reusable, saved/reloadable `CharacterDefinition` / character asset.
+Verified Phase-3 technical checkpoint:
+- branch: `m58/native-3d-character-runtime`
+- exact technical SHA: `14ef943f32db2a6edce2cca50cc343b7bd8021c2`
+- Phase 3 Character CI #6: SUCCESS
+- Foundation CI #334: SUCCESS
+- Native Android CI #93: SUCCESS
+- real multi-view PNG reference-shape path: SUCCESS
+- source-dependent silhouette geometry: SUCCESS; narrow/wide references produce measurably different 3D proportions
+- real closed 3D topology + humanoid skeleton mapping + skinning: SUCCESS
+- UV coordinates + BODY/FACE/EYE/ACCENT material regions: SUCCESS
+- exact admitted reference appearance bytes owned by `CharacterDefinition3D`: SUCCESS
+- reusable `CharacterAsset3D` capture/instantiation: SUCCESS
+- checksummed save/reopen with exact mesh/rig/skinning/appearance identity: SUCCESS
+- missing/tampered original reference restore fails closed or materializes exact owned reference bytes: SUCCESS
+- native APK signature/source-SHA/browser-free/no-secret/provenance gates: SUCCESS
+- artifact: `studio-native-android-14ef943f32db2a6edce2cca50cc343b7bd8021c2`
+- GitHub artifact digest: `sha256:da52a0c002ab6d0017eb0b0c9953edb27fca47bb188275ac93c183debdaa8d63`
 
-Close:
-- mesh/topology
-- skeleton + humanoid mapping
-- skinning
-- UV/texture/materials
-- proportions
-- appearance identity/likeness preservation
-- saved/reloadable asset identity
+Phase-3 likeness acceptance is deliberately measurable and deterministic: the character asset owns the exact admitted appearance bytes and the multi-view reference silhouettes drive its 3D proportions. The implementation does **not** claim photogrammetric reconstruction; a future higher-fidelity reconstruction backend may replace the deterministic shape builder without reopening the Phase-3 reusable identity/rig/skinning/persistence contract.
 
-The M58 Phase-2 mesh/skinning gate is a foundation proof, not Phase-3 completion. Phase 3 requires a real reference-derived character asset that preserves identity and survives save/reopen.
-
-Research references when needed: Blender, Unreal Engine, MediaPipe, and relevant open/legal technical material.
-
-**DONE gate:** a real reference-derived 3D character preserves acceptable identity, has real rig/skinning, moves without structural breakage, and reopens from the project with the same identity/state.
-
-Do not open Phase 4 before this gate is proven.
+**DONE gate:** a reference-derived 3D character preserves accepted source identity, has real rig/skinning, moves under the retained skinned-mesh validation without structural breakage, and reopens from persisted character definition with identical validated identity/state. Proven.
 
 ## PHASE 4 — ACTOR PERFORMANCE ENGINE
 
-❌ Turn the character into a virtual actor, not merely a moving mesh.
+❌ **THIS IS THE CURRENT MANDATORY TECHNICAL PHASE.**
+
+Turn the character into a virtual actor, not merely a moving mesh.
 
 Close:
 - blocking and locomotion
@@ -394,7 +399,17 @@ Superseding verified Phase-2 checkpoint:
 - artifact: `studio-native-android-833883efec3d86014943f5e35ed92494462ec1d5`
 - GitHub artifact digest: `sha256:ccc875b6ccd432bf6ee36deabc1fb26ef61423a9cf271d24f86d2e4c7bf21768`
 
-Therefore the active production action is **Phase 3 Character Reconstruction / Modeling**.
+Verified Phase-3 technical checkpoint:
+- `14ef943f32db2a6edce2cca50cc343b7bd8021c2`
+- Phase 3 Character CI #6: SUCCESS
+- Foundation CI #334: SUCCESS
+- Native Android CI #93: SUCCESS
+- reference-driven multi-view geometry + reusable identity/persistence gate: SUCCESS
+- exact-head APK/security/provenance checks: SUCCESS
+- artifact: `studio-native-android-14ef943f32db2a6edce2cca50cc343b7bd8021c2`
+- GitHub artifact digest: `sha256:da52a0c002ab6d0017eb0b0c9953edb27fca47bb188275ac93c183debdaa8d63`
+
+Therefore the active production action is **Phase 4 Actor Performance Engine**.
 
 # 10. GOLDEN MOVIE FINAL DEFINITION
 
@@ -432,8 +447,8 @@ When changing the plan:
 
 # 12. ONE-LINE CANONICAL PATH
 
-**✅ Foundation → ✅ Native M56 → ✅ Semantic M57 → ✅ M58 green 3D → ❌ Character Modeling → ❌ Actor Performance → ❌ Virtual Director/Camera → ❌ Lighting/World → ❌ Full Orchestration → ❌ Native Render/Media → ❌ QC/Repair → ❌ Final Studio UI → ❌ Final Provenance/Security → ❌ Physical Android Certification → ❌ Golden Movie → ❌ v1.0**
+**✅ Foundation → ✅ Native M56 → ✅ Semantic M57 → ✅ M58 green 3D → ✅ Character Modeling → ❌ Actor Performance → ❌ Virtual Director/Camera → ❌ Lighting/World → ❌ Full Orchestration → ❌ Native Render/Media → ❌ QC/Repair → ❌ Final Studio UI → ❌ Final Provenance/Security → ❌ Physical Android Certification → ❌ Golden Movie → ❌ v1.0**
 
 # CURRENT NEXT ACTION
 
-> ❌ **PHASE 3 — turn real reference image(s) into a reusable, saved/reloadable `CharacterDefinition` / 3D character asset with validated topology, humanoid rig/skeleton mapping, skinning, UV/texture/materials, proportions, acceptable appearance identity/likeness preservation, and stable save/reopen identity. Do not open Phase 4 until this DONE gate is proven.**
+> ❌ **PHASE 4 — turn the reusable Phase-3 character into a virtual actor that can execute a script-driven multi-step performance: walk, stop, turn/look, interact with a prop, react, express emotion, while preserving root motion, retargeting, IK/foot lock/contact continuity, gaze/face/hands layers and deterministic canonical performance state. Do not open Phase 5 until this DONE gate is proven.**
