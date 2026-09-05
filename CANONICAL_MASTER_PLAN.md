@@ -71,20 +71,17 @@ Historical browser code/tests may remain for compatibility and archaeology, but 
 - ✅ Phase 3 reusable `CharacterDefinition3D` / `CharacterAsset3D`, source-dependent multi-view geometry, UV/material regions, exact appearance ownership, checksummed save/reopen identity
 - ✅ Phase 4 deterministic virtual actor: script-driven blocking/locomotion, turns/look, root motion, retargeting, contact constraints, layered acting, emotion/reaction, microperformance, deterministic reopen
 - ✅ Phase 4 real-skinned-mesh continuity gate
-- ✅ Phase 5 deterministic Virtual Director + Camera contract: one accepted Phase-4 master performance → multiple intent-selected cinematic shots with shot-size/lens language, movement, framing/visibility checks, collision clearance, eyeline continuity, and deterministic replay
-- ✅ Latest Phase-5 technical checkpoint verifies native-only boundary, no packaged provider secret, APK existence/signature, embedded exact source SHA, browser-free bytecode, APK SHA-256 and provenance source/APK/signer bindings
+- ✅ Phase 5 deterministic Virtual Director + Camera: one accepted master performance → intent-selected cinematic shots with shot-size/lens language, movement, framing/visibility, collision clearance, eyeline continuity, deterministic replay
+- ✅ Phase 6 canonical World + Lighting: semantic world anchors, environment bounds/obstacles, prop ownership/state transitions, accepted actor root rebasing, canonical RIGHT_HAND/PROP_GRASP contacts, accepted camera rebasing, collision clearance, key/fill/rim/environment lighting, exposure/visibility, camera-aware lighting and deterministic replay
 
 ## 5. Exists but is not production-final
 
 - ⚠️ Final facial/finger visual fidelity beyond the Phase-4 acting contract remains later rendering/QC work.
-- ⚠️ Phase-4 interactions and Phase-5 collision checks currently use explicit deterministic rehearsal target anchors; canonical world/prop anchors and full scene obstacles are Phase 6 scope.
-- ⚠️ Lighting engine and cinematic scene setup.
-- ⚠️ World/props/spatial-state production integration.
-- ⚠️ Full Scene IR → character/performance/camera/lighting/timeline orchestration.
+- ⚠️ Phase 6 proves deterministic world-bound production state, but automatic M57 Scene IR → full production orchestration is Phase 7 scope.
 - ⚠️ Native real-time/offscreen render → encoder → final MP4 production chain.
 - ⚠️ Deterministic QC + repair/self-healing on rendered scenes.
 - ⚠️ Final Compose Studio workflow/UI.
-- ⚠️ Final release artifact provenance/security audit. Phase-5 artifact is a strong checkpoint, not v1 final RC.
+- ⚠️ Final release artifact provenance/security audit. Phase-6 artifact is a strong checkpoint, not v1 final RC.
 
 # 6. ACTIVE MASTER EXECUTION SEQUENCE
 
@@ -127,107 +124,105 @@ Verified checkpoint:
 ✅ **COMPLETE.**
 
 Verified technical checkpoint:
-- branch: `m58/native-3d-character-runtime`
 - SHA: `14ef943f32db2a6edce2cca50cc343b7bd8021c2`
 - Phase 3 Character CI #6: SUCCESS
 - Foundation CI #334: SUCCESS
 - Native Android CI #93: SUCCESS
-- real multi-view PNG reference-shape path: SUCCESS
-- source-dependent silhouette geometry: SUCCESS
-- real topology + humanoid skeleton mapping + skinning: SUCCESS
-- UV + BODY/FACE/EYE/ACCENT material regions: SUCCESS
-- exact reference appearance bytes owned by `CharacterDefinition3D`: SUCCESS
-- reusable asset capture/instantiation + checksummed save/reopen identity: SUCCESS
+- source-dependent multi-view geometry + real topology/rig/skinning + UV/material regions + exact appearance ownership + checksummed reusable save/reopen: SUCCESS
 - artifact: `studio-native-android-14ef943f32db2a6edce2cca50cc343b7bd8021c2`
 - digest: `sha256:da52a0c002ab6d0017eb0b0c9953edb27fca47bb188275ac93c183debdaa8d63`
 
-Acceptance is deterministic and measurable; it does not claim photogrammetric reconstruction. A later higher-fidelity backend may replace the shape builder without reopening the reusable identity/rig/skinning/persistence contract.
+Acceptance is deterministic and measurable; it does not claim photogrammetric reconstruction.
 
-**DONE gate:** reference-derived 3D character preserves accepted source identity, has real rig/skinning, survives structural mesh validation, and reopens with the same validated identity/state. Proven.
+**DONE gate:** reference-derived character preserves accepted identity, real rig/skinning and persisted validated state. Proven.
 
 ## PHASE 4 — ACTOR PERFORMANCE ENGINE
 
 ✅ **COMPLETE.**
 
 Verified technical checkpoint:
-- branch: `m58/native-3d-character-runtime`
 - SHA: `30b0186766b747f4844cba3f4fb91fea4e13349d`
 - Phase 4 Actor Performance CI #4 attempt 2: SUCCESS
 - Foundation CI #343: SUCCESS
 - Native Android CI #102: SUCCESS
-- walk → stop → turn/look → prop pickup/use → react: SUCCESS
-- root motion + semantic retargeting: SUCCESS
-- foot-lock/right-hand/prop-grasp contacts: SUCCESS
-- body/head/face/gaze/hands/secondary layers: SUCCESS
-- emotion/reaction + blink/breath/gaze/head-lead microperformance: SUCCESS
-- deterministic reopen behavior: SUCCESS
-- real skinned mesh finite/volumetric/bounded/continuous: SUCCESS
+- walk/stop/turn/look/prop pickup-use/react, root motion, retargeting, foot/hand/grasp contacts, layered acting, emotion/microperformance, deterministic reopen and real-mesh continuity: SUCCESS
 - artifact: `studio-native-android-30b0186766b747f4844cba3f4fb91fea4e13349d`
 - digest: `sha256:1e72f9a010743f967c53d04a40ab967b428123c270f114ecc0e9644e090d5199`
 
-The first Phase-4 CI #4 attempt was infrastructure-only Maven Central HTTP 429 before project/test execution; unchanged SHA attempt 2 passed. Phase-4 prop contacts use explicit deterministic rehearsal anchors; Phase 6 may replace them with canonical world anchors without reopening Phase 4.
+First CI attempt was infrastructure-only Maven HTTP 429; unchanged SHA attempt 2 passed. Phase-4 rehearsal anchors were explicitly replaceable by Phase 6.
 
-**DONE gate:** required multi-step performance preserves root motion, retargeted layered acting, prop/foot contacts, reaction/emotion state and real-mesh continuity without technical collapse. Proven.
+**DONE gate:** multi-step performance preserves root motion, retargeted acting, contacts, emotion and real-mesh continuity. Proven.
 
 ## PHASE 5 — VIRTUAL DIRECTOR + CAMERA
 
 ✅ **COMPLETE.**
 
 Verified technical checkpoint:
-- branch: `m58/native-3d-character-runtime`
-- exact technical SHA: `2d9b4e4b38dd4c608a38b90062194f9b162cf61f`
+- SHA: `2d9b4e4b38dd4c608a38b90062194f9b162cf61f`
 - Phase 5 Virtual Director CI #1: SUCCESS
 - Foundation CI #349: SUCCESS
 - Native Android CI #108: SUCCESS
-- same accepted Phase-4 master performance drives multiple deterministic camera shots: SUCCESS
-- shot-size language: WIDE / FULL / MEDIUM / MEDIUM_CLOSE / CLOSE_UP: SUCCESS
-- deterministic lens/FOV language using 35/40/50/55/65/85 mm choices: SUCCESS
-- static / tracking / orbit / pan / dolly-in motion coverage: SUCCESS
-- story/performance intent selection (locomotion / interaction / reaction): SUCCESS
-- bounded subject framing and visibility samples: SUCCESS
-- actor and explicit target-anchor collision-clearance gates: SUCCESS
-- stable screen-side eyeline continuity: SUCCESS
-- one-performance-many-cameras + deterministic identical replay: SUCCESS
-- exact-head APK signature/source-SHA/browser-free/no-secret/provenance gates: SUCCESS
+- WIDE/FULL/MEDIUM/MEDIUM_CLOSE/CLOSE_UP; deterministic 35/40/50/55/65/85 mm lens/FOV; static/tracking/orbit/pan/dolly-in; intent shot selection; framing/visibility; target clearance; stable eyeline; one-performance-many-cameras deterministic replay: SUCCESS
 - artifact: `studio-native-android-2d9b4e4b38dd4c608a38b90062194f9b162cf61f`
-- GitHub artifact digest: `sha256:dc277e24c5828d02d49f703a12fbc19432a9ad763e2b50e96986655abfdd8ba6`
+- digest: `sha256:dc277e24c5828d02d49f703a12fbc19432a9ad763e2b50e96986655abfdd8ba6`
 
-Phase 5 intentionally does **not** claim full world collision or lighting integration. Current safety checks cover the actor and explicit Phase-4 rehearsal target anchors. Phase 6 supplies canonical environment/prop anchors, full spatial state and lighting constraints without reopening the Phase-5 camera-language/continuity contract.
+Phase 5 did not claim full world integration; Phase 6 superseded rehearsal target coordinates with canonical spatial state without reopening the camera-language contract.
 
-**DONE gate:** the same master performance produces multiple logical, cinematic, continuity-safe shots with valid framing, lens/motion language, visibility, bounded collision clearance and stable eyeline continuity. Proven.
+**DONE gate:** same master performance produces logical, cinematic, continuity-safe shots with valid framing, lens/motion language and stable eyeline. Proven.
 
 ## PHASE 6 — LIGHTING + WORLD PRODUCTION
 
-❌ **THIS IS THE CURRENT MANDATORY TECHNICAL PHASE.**
+✅ **COMPLETE.**
 
-Connect locations/props/spatial state to the production scene.
+Verified technical checkpoint:
+- branch: `m58/native-3d-character-runtime`
+- exact technical SHA: `79ca570b1796c43ec134599457051dbf9255c9b1`
+- Phase 6 World Lighting CI #4: SUCCESS
+- Foundation CI #358: SUCCESS
+- Native Android CI #117: SUCCESS
+- canonical semantic anchors replace Phase-4/5 rehearsal target anchors: SUCCESS
+- deterministic environment bounds and obstacle state: SUCCESS
+- accepted Phase-4 actor root tracks rebase to the canonical world path: SUCCESS
+- RIGHT_HAND / PROP_GRASP constraints bind to the canonical prop anchor with bounded solved error: SUCCESS
+- deterministic prop ownership/state transitions including PICK_UP → HELD and USE → IN_USE: SUCCESS
+- accepted Phase-5 camera coverage rebases to canonical world state: SUCCESS
+- actor/camera collision clearance against canonical world obstacles/props: SUCCESS
+- deterministic key/fill/rim/environment lighting rig: SUCCESS
+- exposure and subject visibility bounds: SUCCESS
+- camera-aware lighting angle constraints: SUCCESS
+- identical world-bound actor + world/camera/lighting result on deterministic replay: SUCCESS
+- exact-head APK signature/source-SHA/browser-free/no-secret/provenance gates: SUCCESS
+- artifact: `studio-native-android-79ca570b1796c43ec134599457051dbf9255c9b1`
+- GitHub artifact digest: `sha256:dc7151dfde9d74e99b20acf06b595e4ff6cbcc8ebc8403c93670c55e89a354c5`
 
-Close:
-- canonical semantic anchors
-- world/actor/prop collisions
-- prop ownership and state transitions
-- environment layout
-- deterministic reproduction of spatial state
-- key/fill/rim/environment lighting
-- exposure and subject visibility
-- camera-aware lighting constraints
-- replace Phase-4/5 rehearsal anchors with canonical world anchors where appropriate
+An earlier Phase-6 green checkpoint only rebased root/camera/state while leaving Phase-4 hand/grasp contacts on rehearsal coordinates. It was explicitly rejected as insufficient. The strengthened checkpoint above adds `NativeWorldBoundPerformancePhase6` and a dedicated canonical contact-binding test, so Phase-6 closure is based on world-bound actor interaction evidence rather than renamed coordinates.
 
-**DONE gate:** actor + props + camera + lighting deterministically reproduce from the same canonical world state with valid interactions, collision safety and subject visibility.
+**DONE gate:** actor + props + camera + lighting deterministically reproduce from the same canonical world state with valid canonical interaction contacts, collision safety and subject visibility. Proven.
 
 ## PHASE 7 — SCENE IR → FULL PRODUCTION ORCHESTRATION
 
-❌ Connect M57 semantic output to the full production stack.
+❌ **THIS IS THE CURRENT MANDATORY TECHNICAL PHASE.**
 
-Scene/Story IR must produce entities, state transitions, blocking, performances, cameras, lighting, timeline and render jobs.
+Connect accepted M57 semantic output to the completed production stack.
 
-**DONE gate:** one natural-language scene reaches a validated production-ready timeline without manually constructing internal JSON/state.
+Close:
+- Scene/Story IR → character/entity resolution
+- explicit state transitions
+- actor blocking/performance generation
+- canonical world/prop state construction
+- Virtual Director camera generation
+- lighting generation
+- exact timeline construction
+- render-job/DAG construction
+- validation/fail-closed diagnostics
+- deterministic replay
+- no developer-authored internal JSON/state for acceptance scene
+
+**DONE gate:** one real natural-language scene, including Armenian-path compatibility, deterministically produces entities, state transitions, validated character/performance/world/camera/lighting state, production-ready timeline and render jobs without manually constructing internal JSON/state.
 
 ## PHASE 8 — NATIVE RENDER + MEDIA PIPELINE
 
-❌ Finish browser-free native render to production end-to-end quality.
-
-Close real 3D frame rendering, exact frame timing, native/offscreen surface, safe hardware/software encoding, audio sync, muxing, cancellation, long-export safety and decoder-valid final MP4.
+❌ Finish browser-free native render to production end-to-end quality: real 3D frame rendering, exact frame timing, native/offscreen surface, safe hardware/software encoding, audio sync, muxing, cancellation, long-export safety and decoder-valid final MP4.
 
 **DONE gate:** canonical timeline → standards-compatible MP4 with correct duration/frames/audio sync, successful decode-to-EOS verification and no browser/WebView dependency.
 
@@ -235,17 +230,13 @@ Close real 3D frame rendering, exact frame timing, native/offscreen surface, saf
 
 ❌ Deterministic quality gates on rendered scenes: character identity, pose/IK/contact, continuity, prop/world state, camera composition, lighting visibility, timing, media decode, A/V sync and artifact integrity.
 
-Repair may fix only defined/reproducible issues and must leave provenance.
-
-**DONE gate:** intentional failure fixtures are detected, supported failures are measurably repaired, unresolved critical QC can never pass final acceptance.
+**DONE gate:** intentional failures are detected, supported failures measurably repaired, unresolved critical QC never passes final acceptance.
 
 ## PHASE 10 — FINAL STUDIO UI / WORKFLOW
 
-❌ Final Compose workflow:
+❌ Final Compose workflow: project/reference import → screenplay/natural language → compile/diagnostics → character/world → rehearsal → camera/lighting preview → render → timeline/review → QC → export.
 
-**project/reference import → screenplay/natural language → compile/diagnostics → character/world → rehearsal → camera/lighting preview → render → timeline/review → QC → export**
-
-**DONE gate:** Golden Movie workflow can be completed from UI without developer-only canonical-state editing.
+**DONE gate:** Golden Movie workflow completes from UI without developer-only canonical-state editing.
 
 ## PHASE 11 — BUILD / PROVENANCE / SECURITY GATES
 
@@ -265,11 +256,7 @@ Mandatory: install/launch, open/save/reopen, reference import, semantic compile,
 
 ❌ Final product-level acceptance using real reference character material and a real natural-language scenario including Armenian.
 
-Pipeline:
-
-**semantic compile → canonical scene → character → acting/performance → world/props → camera → lighting → render → audio/media → MP4 → QC → physical playback**
-
-Must include at least one real character, full-body motion, gaze/expression/emotion, prop interaction, camera shot/movement, lighting, continuity, audio/dialogue path and final MP4.
+Pipeline: semantic compile → canonical scene → character → acting/performance → world/props → camera → lighting → render → audio/media → MP4 → QC → physical playback.
 
 **DONE gate:** film is meaningfully correct and watchable on the real target device and passes defined QC.
 
@@ -283,7 +270,7 @@ Must include at least one real character, full-body motion, gaze/expression/emot
 
 Research Library: https://drive.google.com/drive/folders/1aJihdEbWRN2s3nSQ4bmjBSr4FNKzi5nK
 
-This is a research/benchmark laboratory, not a dependency bundle. Use lawful clean-room study of Blender/Unreal/MediaPipe/DaVinci/After Effects/Godot/OpenToonz/Krita/ComfyUI/Runway/PixVerse/Ollama concepts only when the active phase needs them. Do not copy proprietary source/assets/code and do not wander away from the active DONE gate.
+This is a research/benchmark laboratory, not a dependency bundle. Use lawful clean-room study only when the active phase needs it. Do not copy proprietary source/assets/code and do not wander away from the active DONE gate.
 
 # 8. MANDATORY NEW-CHAT / AGENT INHERITANCE PROTOCOL
 
@@ -308,12 +295,13 @@ Every new chat/agent must:
 Checkpoints never replace live verification.
 
 - M57 baseline `a96d8ee2fc021b5e04558bd3e9a5f9ac30c0d2c8`: Foundation #313 SUCCESS; Native Android #74 SUCCESS.
-- Phase 2 `833883efec3d86014943f5e35ed92494462ec1d5`: Foundation #320 SUCCESS; Native Android #79 SUCCESS; M57 benchmark + real M58 mesh/skinning SUCCESS.
+- Phase 2 `833883efec3d86014943f5e35ed92494462ec1d5`: Foundation #320 SUCCESS; Native Android #79 SUCCESS.
 - Phase 3 `14ef943f32db2a6edce2cca50cc343b7bd8021c2`: Phase 3 Character #6 SUCCESS; Foundation #334 SUCCESS; Native Android #93 SUCCESS.
 - Phase 4 `30b0186766b747f4844cba3f4fb91fea4e13349d`: Phase 4 Actor Performance #4 attempt 2 SUCCESS; Foundation #343 SUCCESS; Native Android #102 SUCCESS.
-- Phase 5 `2d9b4e4b38dd4c608a38b90062194f9b162cf61f`: Phase 5 Virtual Director #1 SUCCESS; Foundation #349 SUCCESS; Native Android #108 SUCCESS; artifact `studio-native-android-2d9b4e4b38dd4c608a38b90062194f9b162cf61f`; digest `sha256:dc277e24c5828d02d49f703a12fbc19432a9ad763e2b50e96986655abfdd8ba6`.
+- Phase 5 `2d9b4e4b38dd4c608a38b90062194f9b162cf61f`: Phase 5 Virtual Director #1 SUCCESS; Foundation #349 SUCCESS; Native Android #108 SUCCESS.
+- Phase 6 `79ca570b1796c43ec134599457051dbf9255c9b1`: Phase 6 World Lighting #4 SUCCESS; Foundation #358 SUCCESS; Native Android #117 SUCCESS; artifact `studio-native-android-79ca570b1796c43ec134599457051dbf9255c9b1`; digest `sha256:dc7151dfde9d74e99b20acf06b595e4ff6cbcc8ebc8403c93670c55e89a354c5`.
 
-Therefore the active production action is **Phase 6 Lighting + World Production**.
+Therefore the active production action is **Phase 7 Scene IR → Full Production Orchestration**.
 
 # 10. GOLDEN MOVIE FINAL DEFINITION
 
@@ -332,8 +320,8 @@ When changing the plan, preserve history/rationale, update status/evidence, mirr
 
 # 12. ONE-LINE CANONICAL PATH
 
-**✅ Foundation → ✅ Native M56 → ✅ Semantic M57 → ✅ M58 green 3D → ✅ Character Modeling → ✅ Actor Performance → ✅ Virtual Director/Camera → ❌ Lighting/World → ❌ Full Orchestration → ❌ Native Render/Media → ❌ QC/Repair → ❌ Final Studio UI → ❌ Final Provenance/Security → ❌ Physical Android Certification → ❌ Golden Movie → ❌ v1.0**
+**✅ Foundation → ✅ Native M56 → ✅ Semantic M57 → ✅ M58 green 3D → ✅ Character Modeling → ✅ Actor Performance → ✅ Virtual Director/Camera → ✅ Lighting/World → ❌ Full Orchestration → ❌ Native Render/Media → ❌ QC/Repair → ❌ Final Studio UI → ❌ Final Provenance/Security → ❌ Physical Android Certification → ❌ Golden Movie → ❌ v1.0**
 
 # CURRENT NEXT ACTION
 
-> ❌ **PHASE 6 — connect canonical locations, props and spatial state to the accepted actor-performance + Virtual Director stack: semantic anchors, collisions, prop ownership/state transitions, environment layout, key/fill/rim/environment lighting, exposure/visibility and camera-aware lighting constraints. Replace rehearsal anchors with canonical world anchors where appropriate. Do not open Phase 7 until actor + props + camera + lighting deterministically reproduce from the same canonical world state and the Phase-6 DONE gate is proven.**
+> ❌ **PHASE 7 — connect accepted M57 Scene/Story IR directly to the completed character/performance/world/camera/lighting/timeline/render-job contracts. One real natural-language scene must deterministically become a validated production-ready timeline and render-job graph without developer-authored internal JSON/state. Do not open Phase 8 until the Phase-7 DONE gate is proven.**
