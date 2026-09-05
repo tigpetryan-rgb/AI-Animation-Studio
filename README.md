@@ -23,32 +23,31 @@ Core law:
 
 ## Current mandatory phase
 
-**PHASE 7 — SCENE IR → FULL PRODUCTION ORCHESTRATION.**
+**PHASE 8 — NATIVE RENDER + MEDIA PIPELINE.**
 
-Phase 6 is proven complete at the latest verified technical checkpoint:
+Phase 7 is proven complete at the latest verified technical checkpoint:
 
 - branch: `m58/native-3d-character-runtime`
-- exact technical SHA: `79ca570b1796c43ec134599457051dbf9255c9b1`
-- Phase 6 World Lighting CI #4: SUCCESS
-- Foundation CI #358: SUCCESS
-- Native Android CI #117: SUCCESS
-- canonical semantic world anchors replace rehearsal anchors: SUCCESS
-- accepted actor root tracks rebase to the canonical world path: SUCCESS
-- RIGHT_HAND / PROP_GRASP contacts bind to the canonical prop anchor: SUCCESS
-- deterministic prop ownership/state transitions: SUCCESS
-- actor/camera collision clearance against canonical obstacles/props: SUCCESS
-- accepted Virtual Director camera coverage rebased to canonical world state: SUCCESS
-- deterministic key/fill/rim/environment lighting: SUCCESS
-- bounded exposure + camera-aware subject visibility: SUCCESS
-- deterministic world-bound actor + world/lighting replay: SUCCESS
-- artifact: `studio-native-android-79ca570b1796c43ec134599457051dbf9255c9b1`
-- artifact digest: `sha256:dc7151dfde9d74e99b20acf06b595e4ff6cbcc8ebc8403c93670c55e89a354c5`
+- exact technical SHA: `7f64b6e9938527e08d766172df6234a0506eff89`
+- Phase 7 Production Orchestration CI #1: SUCCESS
+- Foundation CI #364: SUCCESS
+- Native Android CI #123: SUCCESS
+- Armenian natural-language entry through the semantic compiler: SUCCESS
+- canonical entity/state resolution: SUCCESS
+- direct Scene IR → accepted character/performance/camera/world/lighting contracts: SUCCESS
+- no legacy Scene-IR-to-text production detour: SUCCESS
+- canonical world-bound actor contacts + prop ownership/state: SUCCESS
+- semantic camera/lighting/environment controls: SUCCESS
+- exact 168-frame contiguous production timeline for 14 s @ 12 fps: SUCCESS
+- identity-bound deterministic render-job DAG: SUCCESS
+- artifact: `studio-native-android-7f64b6e9938527e08d766172df6234a0506eff89`
+- artifact digest: `sha256:7711345bf9f9f85b533a2b6da61e472ae3abb0e656e4fd3ef19b6e80206f978d`
 
-Phase 6 does not claim automatic semantic-to-production orchestration. It proves that the accepted character/performance/camera layers can be resolved against one deterministic canonical world and lighting state.
+Phase 7 stops at a validated canonical timeline and render-job graph. It does not claim final media production.
 
-Current Phase-7 objective is to connect the accepted M57 Scene/Story IR to the complete production stack so one natural-language scene automatically produces entities, state transitions, blocking, performances, canonical world/props, cameras, lighting, timeline and render jobs without developer-built internal JSON/state.
+Current Phase-8 objective is to consume that accepted timeline/job graph and produce real browser-free native frames and a standards-compatible MP4 with exact frame timing/count, safe native/offscreen rendering and encoding, synchronized audio, muxing, cancellation/long-export safety, decode-to-EOS verification and exact media provenance.
 
-The exact branch/SHA/CI facts must always be re-verified live before work. Do not start Phase 8 until the Phase-7 DONE gate is proven.
+The exact branch/SHA/CI facts must always be re-verified live before work. Do not start Phase 9 until the Phase-8 DONE gate is proven.
 
 ## Historical architecture warning
 
