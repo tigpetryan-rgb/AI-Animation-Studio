@@ -40,12 +40,13 @@ jobs:
           echo "AISTUDIO_SOURCE_SHA=$SOURCE_SHA" >> "$GITHUB_ENV"
           echo "AISTUDIO_SOURCE_DATE=$SOURCE_DATE" >> "$GITHUB_ENV"
 
-      - name: Phase 6 canonical world spatial prop collision and lighting gate
+      - name: Phase 6 canonical world spatial contact and lighting gate
         working-directory: apps/studio-runtime-android
         run: |
           ./gradlew \
             :app:testReleaseUnitTest \
             --tests "com.aianimationstudio.runtime.NativeWorldLightingPhase6Test" \
+            --tests "com.aianimationstudio.runtime.NativeWorldBoundPerformancePhase6Test" \
             -PstudioCommitSha="${AISTUDIO_SOURCE_SHA}" \
             -PstudioSourceDate="${AISTUDIO_SOURCE_DATE}" \
             -PruntimeVersion="0.8.0-phase6-ci+${AISTUDIO_SOURCE_SHA:0:12}" \
@@ -55,4 +56,4 @@ jobs:
       - name: Phase 6 contract summary
         run: |
           echo "Phase 6 gate PASS on exact SHA ${AISTUDIO_SOURCE_SHA}"
-          echo "Verified: one canonical world state replaces rehearsal anchors, rebases accepted camera coverage, applies deterministic prop ownership/state transitions, keeps actor/camera collision clearance inside environment bounds, evaluates key/fill/rim/environment exposure, preserves camera-aware subject visibility, and reproduces an identical Phase-6 production plan on replay."
+          echo "Verified: one canonical world state replaces rehearsal anchors, rebases accepted actor root tracks and camera coverage, binds RIGHT_HAND/PROP_GRASP contacts to canonical prop anchors, applies deterministic prop ownership/state transitions, keeps actor/camera collision clearance inside environment bounds, evaluates key/fill/rim/environment exposure, preserves camera-aware subject visibility, and reproduces identical world-bound actor + Phase-6 production plans on replay."
