@@ -23,30 +23,36 @@ Core law:
 
 ## Current mandatory phase
 
-**PHASE 5 — VIRTUAL DIRECTOR + CAMERA.**
+**PHASE 6 — LIGHTING + WORLD PRODUCTION.**
 
-Phase 4 is proven complete at the latest verified technical checkpoint:
+Phase 5 is proven complete at the latest verified technical checkpoint:
 
 - branch: `m58/native-3d-character-runtime`
-- exact technical SHA: `30b0186766b747f4844cba3f4fb91fea4e13349d`
-- Phase 4 Actor Performance CI #4 attempt 2: SUCCESS
-- Foundation CI #343: SUCCESS
-- Native Android CI #102: SUCCESS
-- deterministic script-driven walk → stop → turn/look → prop pickup/use → react performance: SUCCESS
-- root motion + semantic retargeting + foot-lock/contact/grasp continuity: SUCCESS
-- body/head/face/hands/gaze + emotion/reaction/microperformance layers: SUCCESS
-- deterministic reopen continuity: SUCCESS
-- real Phase-3 skinned-mesh deformation continuity gate: SUCCESS
-- artifact: `studio-native-android-30b0186766b747f4844cba3f4fb91fea4e13349d`
-- artifact digest: `sha256:1e72f9a010743f967c53d04a40ab967b428123c270f114ecc0e9644e090d5199`
+- exact technical SHA: `2d9b4e4b38dd4c608a38b90062194f9b162cf61f`
+- Phase 5 Virtual Director CI #1: SUCCESS
+- Foundation CI #349: SUCCESS
+- Native Android CI #108: SUCCESS
+- same accepted Phase-4 master performance → multiple deterministic cinematic shots: SUCCESS
+- WIDE/FULL/MEDIUM/MEDIUM_CLOSE/CLOSE_UP shot-size language: SUCCESS
+- deterministic 35/40/50/55/65/85 mm lens/FOV choices: SUCCESS
+- static/tracking/orbit/pan/dolly-in motion coverage: SUCCESS
+- story/performance-intent shot selection: SUCCESS
+- bounded subject framing and visibility: SUCCESS
+- actor + explicit target-anchor collision clearance: SUCCESS
+- stable screen-side eyeline continuity: SUCCESS
+- deterministic one-performance-many-cameras replay: SUCCESS
+- artifact: `studio-native-android-2d9b4e4b38dd4c608a38b90062194f9b162cf61f`
+- artifact digest: `sha256:dc277e24c5828d02d49f703a12fbc19432a9ad763e2b50e96986655abfdd8ba6`
 
-Current Phase-5 objective is to build a deterministic virtual director and cinematic camera-language engine: shot sizes, composition/framing, lens/FOV, angle, camera zones, static/dolly/pan/tilt/orbit/tracking motion, subject visibility, collision avoidance, eyeline/continuity, one-performance-many-cameras, and shot selection from story/performance intent.
+Phase 5 does not claim full world collision or lighting integration. Its safety contract covers the actor and explicit Phase-4 rehearsal target anchors. Phase 6 owns canonical environment/prop anchors, spatial state, full collision integration and lighting.
 
-The exact branch/SHA/CI facts must always be re-verified live before work. Do not start Phase 6 until the Phase-5 DONE gate is proven.
+Current Phase-6 objective is to connect canonical locations, props and spatial state to the accepted actor-performance + Virtual Director stack: semantic anchors, collisions, prop ownership/state transitions, environment layout, key/fill/rim/environment lighting, exposure/visibility and camera-aware lighting constraints. Rehearsal anchors should be replaced by canonical world anchors where appropriate.
+
+The exact branch/SHA/CI facts must always be re-verified live before work. Do not start Phase 7 until the Phase-6 DONE gate is proven.
 
 ## Historical architecture warning
 
-This repository contains substantial historical browser/PWA/WebView code, tests, documents, and milestones. They remain valuable as implementation history, compatibility evidence, and reusable subsystem code, but they **do not define the final production runtime anymore**.
+This repository contains substantial historical browser/PWA/WebView code, tests, documents and milestones. They remain valuable as implementation history, compatibility evidence and reusable subsystem code, but they **do not define the final production runtime anymore**.
 
 The following are no longer primary production directions unless the user explicitly changes the canonical plan:
 
@@ -63,13 +69,13 @@ The following are no longer primary production directions unless the user explic
 3. AI proposes; it never silently mutates canonical state.
 4. Human locks always win.
 5. Deterministic code is preferred for deterministic problems.
-6. Character appearance, actor performance, camera, lighting, and world state are explicit independent layers.
+6. Character appearance, actor performance, camera, lighting and world state are explicit independent layers.
 7. Every expensive operation should be cacheable where practical.
 8. Cache is disposable and is not canonical state.
 9. Story events produce explicit state transitions.
 10. Definitions and runtime instances remain separate.
 11. Project formats must survive Studio upgrades through migrations.
-12. Autonomous actions must be traceable, validated, and reversible where practical.
+12. Autonomous actions must be traceable, validated and reversible where practical.
 
 ## Canonical references
 
