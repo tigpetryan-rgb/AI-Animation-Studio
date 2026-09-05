@@ -33,37 +33,37 @@ https://docs.google.com/document/d/1fBywdZl3_D7YEGp76Eivb-zB2ACnmh77GO2KCf7uWpE/
 
 ## Current phase
 
-**PHASE 5 IS COMPLETE. PHASE 6 — LIGHTING + WORLD PRODUCTION — IS THE CURRENT MANDATORY PRODUCTION PHASE.**
+**PHASE 6 IS COMPLETE. PHASE 7 — SCENE IR → FULL PRODUCTION ORCHESTRATION — IS THE CURRENT MANDATORY PRODUCTION PHASE.**
 
-Latest verified Phase-5 technical checkpoint is historical evidence and MUST be reverified live before relying on it:
+Latest verified Phase-6 technical checkpoint is historical evidence and MUST be reverified live before relying on it:
 
 - branch: `m58/native-3d-character-runtime`
-- exact technical SHA: `2d9b4e4b38dd4c608a38b90062194f9b162cf61f`
-- Phase 5 Virtual Director CI #1: SUCCESS
-- Foundation CI #349: SUCCESS
-- Native Android CI #108: SUCCESS
-- one accepted Phase-4 master performance → multiple deterministic cinematic shots: SUCCESS
-- WIDE/FULL/MEDIUM/MEDIUM_CLOSE/CLOSE_UP shot language: SUCCESS
-- deterministic 35/40/50/55/65/85 mm lens/FOV choices: SUCCESS
-- static/tracking/orbit/pan/dolly-in motion coverage: SUCCESS
-- intent-driven locomotion/interaction/reaction shot selection: SUCCESS
-- bounded subject framing + visibility: SUCCESS
-- actor and explicit target-anchor collision clearance: SUCCESS
-- stable screen-side eyeline continuity: SUCCESS
-- deterministic one-performance-many-cameras replay: SUCCESS
+- exact technical SHA: `79ca570b1796c43ec134599457051dbf9255c9b1`
+- Phase 6 World Lighting CI #4: SUCCESS
+- Foundation CI #358: SUCCESS
+- Native Android CI #117: SUCCESS
+- canonical semantic anchors replace rehearsal target anchors: SUCCESS
+- accepted Phase-4 actor root tracks rebase to the canonical world path: SUCCESS
+- RIGHT_HAND / PROP_GRASP contacts bind to the canonical prop anchor: SUCCESS
+- deterministic prop ownership/state transitions: SUCCESS
+- environment bounds + actor/camera collision clearance against world obstacles/props: SUCCESS
+- accepted Phase-5 camera coverage rebased onto canonical world state: SUCCESS
+- deterministic key/fill/rim/environment lighting + exposure/subject visibility: SUCCESS
+- camera-aware lighting constraints: SUCCESS
+- deterministic identical world-bound actor + Phase-6 production replay: SUCCESS
 - exact-head APK/security/provenance checks: SUCCESS
-- artifact: `studio-native-android-2d9b4e4b38dd4c608a38b90062194f9b162cf61f`
-- artifact digest: `sha256:dc277e24c5828d02d49f703a12fbc19432a9ad763e2b50e96986655abfdd8ba6`
+- artifact: `studio-native-android-79ca570b1796c43ec134599457051dbf9255c9b1`
+- artifact digest: `sha256:dc7151dfde9d74e99b20acf06b595e4ff6cbcc8ebc8403c93670c55e89a354c5`
 
-Phase-5 safety does not claim full world collision. It covers the actor and explicit Phase-4 rehearsal target anchors. Phase 6 owns canonical environment/prop anchors, spatial state, full collision integration and lighting.
+Phase 6 deliberately does not perform automatic Scene IR → whole-production orchestration. It proves the accepted character/performance/camera stack can be bound to one canonical world + lighting state. Phase 7 owns automatic orchestration from semantic IR.
 
 Current concrete objective:
 
-**Connect canonical locations, props and spatial state to the accepted actor-performance + Virtual Director stack: semantic anchors, collisions, prop ownership/state transitions, environment layout, key/fill/rim/environment lighting, exposure/visibility and camera-aware lighting constraints. Replace rehearsal anchors with canonical world anchors where appropriate.**
+**Connect the accepted M57 Scene/Story IR directly to the completed character, world, actor-performance, camera, lighting, timeline and render-job contracts so one natural-language scene becomes a validated production-ready timeline without developer-built internal JSON/state.**
 
-Phase-6 DONE gate requires actor + props + camera + lighting to deterministically reproduce from the same canonical world state with valid interactions, collision safety and subject visibility.
+Phase-7 DONE gate requires one natural-language scene to produce entities, state transitions, blocking, performances, canonical world/props, cameras, lighting, timeline and render jobs deterministically without manual internal-state construction.
 
-Do not start Phase 7 Scene IR → Full Production Orchestration until Phase 6's DONE gate is proven.
+Do not start Phase 8 Native Render + Media Pipeline until Phase 7's DONE gate is proven.
 
 ## Required session ending
 
