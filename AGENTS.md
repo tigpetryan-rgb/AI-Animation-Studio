@@ -34,30 +34,35 @@ https://docs.google.com/document/d/1fBywdZl3_D7YEGp76Eivb-zB2ACnmh77GO2KCf7uWpE/
 
 ## Current phase
 
-**PHASE 3 IS COMPLETE. PHASE 4 — ACTOR PERFORMANCE ENGINE — IS THE CURRENT MANDATORY PRODUCTION PHASE.**
+**PHASE 4 IS COMPLETE. PHASE 5 — VIRTUAL DIRECTOR + CAMERA — IS THE CURRENT MANDATORY PRODUCTION PHASE.**
 
-Latest verified Phase-3 technical checkpoint below is historical evidence and MUST be reverified live before relying on it:
+Latest verified Phase-4 technical checkpoint below is historical evidence and MUST be reverified live before relying on it:
 
 - branch: `m58/native-3d-character-runtime`
-- exact technical SHA: `14ef943f32db2a6edce2cca50cc343b7bd8021c2`
-- Phase 3 Character CI #6: SUCCESS
-- Foundation CI #334: SUCCESS
-- Native Android CI #93: SUCCESS
-- multi-view PNG reference silhouettes drive measurably source-dependent 3D proportions: SUCCESS
-- real topology/humanoid rig/skinning/UV/material regions: SUCCESS
-- exact reference appearance bytes owned by reusable `CharacterDefinition3D`: SUCCESS
-- checksummed save/reopen and exact appearance/materialization continuity: SUCCESS
+- exact technical SHA: `30b0186766b747f4844cba3f4fb91fea4e13349d`
+- Phase 4 Actor Performance CI #4 attempt 2: SUCCESS
+- Foundation CI #343: SUCCESS
+- Native Android CI #102: SUCCESS
+- walk/stop/turn/look/prop pickup+use/reaction multi-step performance: SUCCESS
+- root motion + semantic retargeting: SUCCESS
+- explicit foot-lock/right-hand/prop-grasp contacts: SUCCESS
+- body/head/face/gaze/hands/secondary acting layers: SUCCESS
+- emotion/reaction + blink/breath/gaze/head-lead microperformance hooks: SUCCESS
+- deterministic equivalent performance after reusable-character reopen: SUCCESS
+- real Phase-3 skinned mesh remains finite, volumetric, bounded and continuous across sampled performance poses: SUCCESS
 - exact-head native APK/security/provenance checks: SUCCESS
-- artifact: `studio-native-android-14ef943f32db2a6edce2cca50cc343b7bd8021c2`
-- artifact digest: `sha256:da52a0c002ab6d0017eb0b0c9953edb27fca47bb188275ac93c183debdaa8d63`
+- artifact: `studio-native-android-30b0186766b747f4844cba3f4fb91fea4e13349d`
+- artifact digest: `sha256:1e72f9a010743f967c53d04a40ab967b428123c270f114ecc0e9644e090d5199`
+
+The first Phase-4 CI #4 attempt was an infrastructure-only Maven Central HTTP 429 failure before project/test execution; the unchanged exact SHA passed attempt 2. Do not reinterpret that external rate-limit event as a product failure.
 
 Current concrete objective:
 
-**Turn the reusable Phase-3 character into a deterministic virtual actor: blocking/locomotion, turns, root motion + retargeting, IK/foot lock/contact continuity, body/head/face/hands/gaze layers, prop pickup/use, emotion/reaction timing and acting-intent/microperformance hooks.**
+**Build the deterministic Virtual Director + Camera engine over the accepted Phase-4 master performance: shot sizes, composition/framing, lens/FOV, angle, camera zones, static/dolly/pan/tilt/orbit/tracking motion, subject visibility, collision avoidance, eyeline/continuity, one-performance-many-cameras and shot selection from story/performance intent.**
 
-Phase-4 DONE gate requires one script-driven multi-step scene: walk, stop, look/turn, interact with a prop, react and express emotion without visible contact/continuity collapse.
+Phase-5 DONE gate requires the same master performance to produce multiple logical, cinematic, continuity-safe shots without actor/world collision or broken framing.
 
-Do not start Phase 5 Virtual Director/Camera until Phase 4's DONE gate is proven.
+Do not start Phase 6 Lighting + World Production until Phase 5's DONE gate is proven.
 
 ## Required session ending
 
