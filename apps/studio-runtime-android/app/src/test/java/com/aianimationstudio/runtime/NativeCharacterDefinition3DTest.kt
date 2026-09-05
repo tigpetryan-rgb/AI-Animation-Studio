@@ -3,7 +3,6 @@ package com.aianimationstudio.runtime
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -106,13 +105,13 @@ class NativeCharacterDefinition3DTest {
             assertTrue(reference.localFile.delete())
             assertFalse(reference.localFile.exists())
 
-            val restored = assertNotNull(
+            val restored = requireNotNull(
                 store.restoreVerified(
                     actorId = definition.asset.actorId,
                     referenceSha256 = definition.asset.referenceSha256,
                     sourceCommit = definition.asset.sourceCommit,
                 ),
-            ).let { requireNotNull(it) }
+            )
 
             assertEquals(definition.asset.assetId, restored.definition.asset.assetId)
             assertEquals(definition.asset.skeleton, restored.definition.asset.skeleton)
