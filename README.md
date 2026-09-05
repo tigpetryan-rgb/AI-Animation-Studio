@@ -23,20 +23,24 @@ Core law:
 
 ## Current mandatory phase
 
-**PHASE 3 — CHARACTER RECONSTRUCTION / MODELING.**
+**PHASE 4 — ACTOR PERFORMANCE ENGINE.**
 
-Phase 2 is proven complete at the latest recorded checkpoint:
+Phase 3 is proven complete at the latest recorded technical checkpoint:
 
 - branch: `m58/native-3d-character-runtime`
-- exact SHA: `833883efec3d86014943f5e35ed92494462ec1d5`
-- Foundation CI #320: SUCCESS
-- Native Android CI #79: SUCCESS
-- M57 300-case multilingual semantic benchmark: SUCCESS
-- M58 real 3D mesh and skinning gate: SUCCESS
+- exact technical SHA: `14ef943f32db2a6edce2cca50cc343b7bd8021c2`
+- Phase 3 Character CI #6: SUCCESS
+- Foundation CI #334: SUCCESS
+- Native Android CI #93: SUCCESS
+- deterministic multi-view PNG reference geometry gate: SUCCESS
+- reusable `CharacterDefinition3D` / `CharacterAsset3D`, humanoid rig/skinning, UV/material regions, source-dependent proportions and exact appearance ownership: SUCCESS
+- checksummed save/reopen identity: SUCCESS
+- artifact: `studio-native-android-14ef943f32db2a6edce2cca50cc343b7bd8021c2`
+- artifact digest: `sha256:da52a0c002ab6d0017eb0b0c9953edb27fca47bb188275ac93c183debdaa8d63`
 
-Current Phase-3 objective is to turn real reference image(s) into a reusable, saved/reloadable `CharacterDefinition` / 3D character asset with validated topology, humanoid rig/skeleton mapping, skinning, UV/texture/materials, proportions, acceptable appearance identity/likeness preservation, and stable save/reopen identity.
+Current Phase-4 objective is to turn that reusable character into a deterministic virtual actor with blocking/locomotion, turns, root motion/retargeting, IK/foot lock/contact continuity, body/head/face/hands/gaze layers, prop interaction, emotion/reaction timing and acting-intent/microperformance hooks.
 
-The exact branch/SHA/CI facts must always be re-verified live before work. Do not start Phase 4 until the Phase-3 DONE gate is proven.
+The exact branch/SHA/CI facts must always be re-verified live before work. Do not start Phase 5 until the Phase-4 DONE gate is proven.
 
 ## Historical architecture warning
 
