@@ -23,32 +23,32 @@ Core law:
 
 ## Current mandatory phase
 
-**PHASE 6 — LIGHTING + WORLD PRODUCTION.**
+**PHASE 7 — SCENE IR → FULL PRODUCTION ORCHESTRATION.**
 
-Phase 5 is proven complete at the latest verified technical checkpoint:
+Phase 6 is proven complete at the latest verified technical checkpoint:
 
 - branch: `m58/native-3d-character-runtime`
-- exact technical SHA: `2d9b4e4b38dd4c608a38b90062194f9b162cf61f`
-- Phase 5 Virtual Director CI #1: SUCCESS
-- Foundation CI #349: SUCCESS
-- Native Android CI #108: SUCCESS
-- same accepted Phase-4 master performance → multiple deterministic cinematic shots: SUCCESS
-- WIDE/FULL/MEDIUM/MEDIUM_CLOSE/CLOSE_UP shot-size language: SUCCESS
-- deterministic 35/40/50/55/65/85 mm lens/FOV choices: SUCCESS
-- static/tracking/orbit/pan/dolly-in motion coverage: SUCCESS
-- story/performance-intent shot selection: SUCCESS
-- bounded subject framing and visibility: SUCCESS
-- actor + explicit target-anchor collision clearance: SUCCESS
-- stable screen-side eyeline continuity: SUCCESS
-- deterministic one-performance-many-cameras replay: SUCCESS
-- artifact: `studio-native-android-2d9b4e4b38dd4c608a38b90062194f9b162cf61f`
-- artifact digest: `sha256:dc277e24c5828d02d49f703a12fbc19432a9ad763e2b50e96986655abfdd8ba6`
+- exact technical SHA: `79ca570b1796c43ec134599457051dbf9255c9b1`
+- Phase 6 World Lighting CI #4: SUCCESS
+- Foundation CI #358: SUCCESS
+- Native Android CI #117: SUCCESS
+- canonical semantic world anchors replace rehearsal anchors: SUCCESS
+- accepted actor root tracks rebase to the canonical world path: SUCCESS
+- RIGHT_HAND / PROP_GRASP contacts bind to the canonical prop anchor: SUCCESS
+- deterministic prop ownership/state transitions: SUCCESS
+- actor/camera collision clearance against canonical obstacles/props: SUCCESS
+- accepted Virtual Director camera coverage rebased to canonical world state: SUCCESS
+- deterministic key/fill/rim/environment lighting: SUCCESS
+- bounded exposure + camera-aware subject visibility: SUCCESS
+- deterministic world-bound actor + world/lighting replay: SUCCESS
+- artifact: `studio-native-android-79ca570b1796c43ec134599457051dbf9255c9b1`
+- artifact digest: `sha256:dc7151dfde9d74e99b20acf06b595e4ff6cbcc8ebc8403c93670c55e89a354c5`
 
-Phase 5 does not claim full world collision or lighting integration. Its safety contract covers the actor and explicit Phase-4 rehearsal target anchors. Phase 6 owns canonical environment/prop anchors, spatial state, full collision integration and lighting.
+Phase 6 does not claim automatic semantic-to-production orchestration. It proves that the accepted character/performance/camera layers can be resolved against one deterministic canonical world and lighting state.
 
-Current Phase-6 objective is to connect canonical locations, props and spatial state to the accepted actor-performance + Virtual Director stack: semantic anchors, collisions, prop ownership/state transitions, environment layout, key/fill/rim/environment lighting, exposure/visibility and camera-aware lighting constraints. Rehearsal anchors should be replaced by canonical world anchors where appropriate.
+Current Phase-7 objective is to connect the accepted M57 Scene/Story IR to the complete production stack so one natural-language scene automatically produces entities, state transitions, blocking, performances, canonical world/props, cameras, lighting, timeline and render jobs without developer-built internal JSON/state.
 
-The exact branch/SHA/CI facts must always be re-verified live before work. Do not start Phase 7 until the Phase-6 DONE gate is proven.
+The exact branch/SHA/CI facts must always be re-verified live before work. Do not start Phase 8 until the Phase-7 DONE gate is proven.
 
 ## Historical architecture warning
 
