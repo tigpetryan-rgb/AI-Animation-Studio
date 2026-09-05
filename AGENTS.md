@@ -34,26 +34,30 @@ https://docs.google.com/document/d/1fBywdZl3_D7YEGp76Eivb-zB2ACnmh77GO2KCf7uWpE/
 
 ## Current phase
 
-**PHASE 2 IS COMPLETE. PHASE 3 — CHARACTER RECONSTRUCTION / MODELING — IS THE CURRENT MANDATORY PRODUCTION PHASE.**
+**PHASE 3 IS COMPLETE. PHASE 4 — ACTOR PERFORMANCE ENGINE — IS THE CURRENT MANDATORY PRODUCTION PHASE.**
 
-Latest verified Phase-2 checkpoint below is historical evidence and MUST be reverified live before relying on it:
+Latest verified Phase-3 technical checkpoint below is historical evidence and MUST be reverified live before relying on it:
 
 - branch: `m58/native-3d-character-runtime`
-- SHA: `833883efec3d86014943f5e35ed92494462ec1d5`
-- Foundation CI #320: SUCCESS
-- Native Android CI #79: SUCCESS
-- M57 300-case multilingual semantic benchmark: SUCCESS
-- M58 real 3D mesh and skinning gate: SUCCESS
+- exact technical SHA: `14ef943f32db2a6edce2cca50cc343b7bd8021c2`
+- Phase 3 Character CI #6: SUCCESS
+- Foundation CI #334: SUCCESS
+- Native Android CI #93: SUCCESS
+- multi-view PNG reference silhouettes drive measurably source-dependent 3D proportions: SUCCESS
+- real topology/humanoid rig/skinning/UV/material regions: SUCCESS
+- exact reference appearance bytes owned by reusable `CharacterDefinition3D`: SUCCESS
+- checksummed save/reopen and exact appearance/materialization continuity: SUCCESS
 - exact-head native APK/security/provenance checks: SUCCESS
-- artifact: `studio-native-android-833883efec3d86014943f5e35ed92494462ec1d5`
+- artifact: `studio-native-android-14ef943f32db2a6edce2cca50cc343b7bd8021c2`
+- artifact digest: `sha256:da52a0c002ab6d0017eb0b0c9953edb27fca47bb188275ac93c183debdaa8d63`
 
 Current concrete objective:
 
-**Close reference image(s) → reusable, saved/reloadable `CharacterDefinition` / 3D character asset: mesh/topology, humanoid rig/skeleton mapping, skinning, UV/texture/materials, proportions, acceptable identity/likeness preservation, and stable save/reopen identity.**
+**Turn the reusable Phase-3 character into a deterministic virtual actor: blocking/locomotion, turns, root motion + retargeting, IK/foot lock/contact continuity, body/head/face/hands/gaze layers, prop pickup/use, emotion/reaction timing and acting-intent/microperformance hooks.**
 
-The Phase-2 3D gate proves the mesh/skinning foundation; it does **not** by itself prove Phase-3 character reconstruction acceptance.
+Phase-4 DONE gate requires one script-driven multi-step scene: walk, stop, look/turn, interact with a prop, react and express emotion without visible contact/continuity collapse.
 
-Do not start Phase 4 Actor Performance until Phase 3's DONE gate is proven.
+Do not start Phase 5 Virtual Director/Camera until Phase 4's DONE gate is proven.
 
 ## Required session ending
 
