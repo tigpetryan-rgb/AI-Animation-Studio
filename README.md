@@ -23,24 +23,26 @@ Core law:
 
 ## Current mandatory phase
 
-**PHASE 4 — ACTOR PERFORMANCE ENGINE.**
+**PHASE 5 — VIRTUAL DIRECTOR + CAMERA.**
 
-Phase 3 is proven complete at the latest recorded technical checkpoint:
+Phase 4 is proven complete at the latest verified technical checkpoint:
 
 - branch: `m58/native-3d-character-runtime`
-- exact technical SHA: `14ef943f32db2a6edce2cca50cc343b7bd8021c2`
-- Phase 3 Character CI #6: SUCCESS
-- Foundation CI #334: SUCCESS
-- Native Android CI #93: SUCCESS
-- deterministic multi-view PNG reference geometry gate: SUCCESS
-- reusable `CharacterDefinition3D` / `CharacterAsset3D`, humanoid rig/skinning, UV/material regions, source-dependent proportions and exact appearance ownership: SUCCESS
-- checksummed save/reopen identity: SUCCESS
-- artifact: `studio-native-android-14ef943f32db2a6edce2cca50cc343b7bd8021c2`
-- artifact digest: `sha256:da52a0c002ab6d0017eb0b0c9953edb27fca47bb188275ac93c183debdaa8d63`
+- exact technical SHA: `30b0186766b747f4844cba3f4fb91fea4e13349d`
+- Phase 4 Actor Performance CI #4 attempt 2: SUCCESS
+- Foundation CI #343: SUCCESS
+- Native Android CI #102: SUCCESS
+- deterministic script-driven walk → stop → turn/look → prop pickup/use → react performance: SUCCESS
+- root motion + semantic retargeting + foot-lock/contact/grasp continuity: SUCCESS
+- body/head/face/hands/gaze + emotion/reaction/microperformance layers: SUCCESS
+- deterministic reopen continuity: SUCCESS
+- real Phase-3 skinned-mesh deformation continuity gate: SUCCESS
+- artifact: `studio-native-android-30b0186766b747f4844cba3f4fb91fea4e13349d`
+- artifact digest: `sha256:1e72f9a010743f967c53d04a40ab967b428123c270f114ecc0e9644e090d5199`
 
-Current Phase-4 objective is to turn that reusable character into a deterministic virtual actor with blocking/locomotion, turns, root motion/retargeting, IK/foot lock/contact continuity, body/head/face/hands/gaze layers, prop interaction, emotion/reaction timing and acting-intent/microperformance hooks.
+Current Phase-5 objective is to build a deterministic virtual director and cinematic camera-language engine: shot sizes, composition/framing, lens/FOV, angle, camera zones, static/dolly/pan/tilt/orbit/tracking motion, subject visibility, collision avoidance, eyeline/continuity, one-performance-many-cameras, and shot selection from story/performance intent.
 
-The exact branch/SHA/CI facts must always be re-verified live before work. Do not start Phase 5 until the Phase-4 DONE gate is proven.
+The exact branch/SHA/CI facts must always be re-verified live before work. Do not start Phase 6 until the Phase-5 DONE gate is proven.
 
 ## Historical architecture warning
 
