@@ -33,37 +33,37 @@ https://docs.google.com/document/d/1fBywdZl3_D7YEGp76Eivb-zB2ACnmh77GO2KCf7uWpE/
 
 ## Current phase
 
-**PHASE 6 IS COMPLETE. PHASE 7 — SCENE IR → FULL PRODUCTION ORCHESTRATION — IS THE CURRENT MANDATORY PRODUCTION PHASE.**
+**PHASE 7 IS COMPLETE. PHASE 8 — NATIVE RENDER + MEDIA PIPELINE — IS THE CURRENT MANDATORY PRODUCTION PHASE.**
 
-Latest verified Phase-6 technical checkpoint is historical evidence and MUST be reverified live before relying on it:
+Latest verified Phase-7 technical checkpoint is historical evidence and MUST be reverified live before relying on it:
 
 - branch: `m58/native-3d-character-runtime`
-- exact technical SHA: `79ca570b1796c43ec134599457051dbf9255c9b1`
-- Phase 6 World Lighting CI #4: SUCCESS
-- Foundation CI #358: SUCCESS
-- Native Android CI #117: SUCCESS
-- canonical semantic anchors replace rehearsal target anchors: SUCCESS
-- accepted Phase-4 actor root tracks rebase to the canonical world path: SUCCESS
-- RIGHT_HAND / PROP_GRASP contacts bind to the canonical prop anchor: SUCCESS
-- deterministic prop ownership/state transitions: SUCCESS
-- environment bounds + actor/camera collision clearance against world obstacles/props: SUCCESS
-- accepted Phase-5 camera coverage rebased onto canonical world state: SUCCESS
-- deterministic key/fill/rim/environment lighting + exposure/subject visibility: SUCCESS
-- camera-aware lighting constraints: SUCCESS
-- deterministic identical world-bound actor + Phase-6 production replay: SUCCESS
+- exact technical SHA: `7f64b6e9938527e08d766172df6234a0506eff89`
+- Phase 7 Production Orchestration CI #1: SUCCESS
+- Foundation CI #364: SUCCESS
+- Native Android CI #123: SUCCESS
+- Armenian natural-language Scene IR entry path: SUCCESS
+- exact script/reference/source identity binding: SUCCESS
+- canonical character/prop/location entity resolution: SUCCESS
+- direct Scene IR → Phase-4/5/6 production contracts without legacy textual lowering: SUCCESS
+- canonical prop transitions + world-bound hand/grasp contacts: SUCCESS
+- semantic camera/lighting/environment control coverage: SUCCESS
+- 320×240 @ 12 fps × 14 s → exact 168-frame contiguous production timeline: SUCCESS
+- identity-bound acyclic prepare/render-shot DAG: SUCCESS
+- deterministic replay fingerprint/timeline/jobs/state: SUCCESS
 - exact-head APK/security/provenance checks: SUCCESS
-- artifact: `studio-native-android-79ca570b1796c43ec134599457051dbf9255c9b1`
-- artifact digest: `sha256:dc7151dfde9d74e99b20acf06b595e4ff6cbcc8ebc8403c93670c55e89a354c5`
+- artifact: `studio-native-android-7f64b6e9938527e08d766172df6234a0506eff89`
+- artifact digest: `sha256:7711345bf9f9f85b533a2b6da61e472ae3abb0e656e4fd3ef19b6e80206f978d`
 
-Phase 6 deliberately does not perform automatic Scene IR → whole-production orchestration. It proves the accepted character/performance/camera stack can be bound to one canonical world + lighting state. Phase 7 owns automatic orchestration from semantic IR.
+Phase 7 intentionally stops at a validated canonical timeline and render-job graph. It does not claim real frame rendering, encoding, muxing, decoder validity or long-export safety. Those are Phase 8 scope.
 
 Current concrete objective:
 
-**Connect the accepted M57 Scene/Story IR directly to the completed character, world, actor-performance, camera, lighting, timeline and render-job contracts so one natural-language scene becomes a validated production-ready timeline without developer-built internal JSON/state.**
+**Consume the accepted Phase-7 frame-exact production timeline/render-job graph and finish the browser-free native render-to-media chain: real 3D frames, exact frame timing, native/offscreen surface, safe encoding, audio synchronization, MP4 muxing, cancellation/long-export safety, decode-to-EOS verification and media provenance.**
 
-Phase-7 DONE gate requires one natural-language scene to produce entities, state transitions, blocking, performances, canonical world/props, cameras, lighting, timeline and render jobs deterministically without manual internal-state construction.
+Phase-8 DONE gate requires the accepted Phase-7 canonical timeline to produce a standards-compatible MP4 with correct duration/frame count/audio sync, successful decode-to-EOS verification, cancellation/long-export safety and no browser/WebView dependency.
 
-Do not start Phase 8 Native Render + Media Pipeline until Phase 7's DONE gate is proven.
+Do not start Phase 9 QC + Repair until Phase 8's DONE gate is proven.
 
 ## Required session ending
 
