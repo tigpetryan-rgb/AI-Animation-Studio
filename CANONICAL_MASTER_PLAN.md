@@ -73,15 +73,16 @@ Historical browser code/tests may remain for compatibility and archaeology, but 
 - ✅ Phase 4 real-skinned-mesh continuity gate
 - ✅ Phase 5 deterministic Virtual Director + Camera: one accepted master performance → intent-selected cinematic shots with shot-size/lens language, movement, framing/visibility, collision clearance, eyeline continuity, deterministic replay
 - ✅ Phase 6 canonical World + Lighting: semantic world anchors, environment bounds/obstacles, prop ownership/state transitions, accepted actor root rebasing, canonical RIGHT_HAND/PROP_GRASP contacts, accepted camera rebasing, collision clearance, key/fill/rim/environment lighting, exposure/visibility, camera-aware lighting and deterministic replay
+- ✅ Phase 7 direct Scene IR → full production orchestration: canonical entities/state, reusable character, accepted actor performance, Virtual Director camera, canonical world/props, world-bound contacts, lighting, frame-exact production timeline and identity-bound render-job DAG without legacy Scene-IR-to-text lowering
 
 ## 5. Exists but is not production-final
 
 - ⚠️ Final facial/finger visual fidelity beyond the Phase-4 acting contract remains later rendering/QC work.
-- ⚠️ Phase 6 proves deterministic world-bound production state, but automatic M57 Scene IR → full production orchestration is Phase 7 scope.
+- ⚠️ Phase 7 produces a validated render-ready canonical timeline/job graph, but it deliberately does not render or encode media; that is Phase 8 scope.
 - ⚠️ Native real-time/offscreen render → encoder → final MP4 production chain.
 - ⚠️ Deterministic QC + repair/self-healing on rendered scenes.
 - ⚠️ Final Compose Studio workflow/UI.
-- ⚠️ Final release artifact provenance/security audit. Phase-6 artifact is a strong checkpoint, not v1 final RC.
+- ⚠️ Final release artifact provenance/security audit. Phase-7 artifact is a strong checkpoint, not v1 final RC.
 
 # 6. ACTIVE MASTER EXECUTION SEQUENCE
 
@@ -201,30 +202,52 @@ An earlier Phase-6 green checkpoint only rebased root/camera/state while leaving
 
 ## PHASE 7 — SCENE IR → FULL PRODUCTION ORCHESTRATION
 
-❌ **THIS IS THE CURRENT MANDATORY TECHNICAL PHASE.**
+✅ **COMPLETE.**
 
-Connect accepted M57 semantic output to the completed production stack.
+Verified technical checkpoint:
+- branch: `m58/native-3d-character-runtime`
+- exact technical SHA: `7f64b6e9938527e08d766172df6234a0506eff89`
+- Phase 7 Production Orchestration CI #1: SUCCESS
+- Foundation CI #364: SUCCESS
+- Native Android CI #123: SUCCESS
+- Armenian natural-language acceptance scene enters through `NaturalLanguageSceneCompiler`: SUCCESS
+- exact script/reference/source identity binding: SUCCESS
+- Scene IR target ids → canonical character/prop/location entities: SUCCESS
+- deterministic Scene IR → actor story/performance lowering without legacy textual production coordinator: SUCCESS
+- accepted Phase-4 performance + Phase-5 camera + Phase-6 world/lighting/world-bound contacts: SUCCESS
+- CAMERA_MOVE / LIGHTING_CHANGE / ENVIRONMENT_CHANGE semantic control coverage: SUCCESS
+- canonical prop ownership transition and canonical hand/grasp contact binding: SUCCESS
+- exact output 320×240 @ 12 fps × 14 s → 168 contiguous production frames: SUCCESS
+- identity-bound acyclic prepare/render-shot DAG: SUCCESS
+- deterministic replay fingerprint/timeline/jobs/state: SUCCESS
+- fail-closed missing reference identity: SUCCESS
+- exact-head APK signature/source-SHA/browser-free/no-secret/provenance gates: SUCCESS
+- artifact: `studio-native-android-7f64b6e9938527e08d766172df6234a0506eff89`
+- GitHub artifact digest: `sha256:7711345bf9f9f85b533a2b6da61e472ae3abb0e656e4fd3ef19b6e80206f978d`
 
-Close:
-- Scene/Story IR → character/entity resolution
-- explicit state transitions
-- actor blocking/performance generation
-- canonical world/prop state construction
-- Virtual Director camera generation
-- lighting generation
-- exact timeline construction
-- render-job/DAG construction
-- validation/fail-closed diagnostics
-- deterministic replay
-- no developer-authored internal JSON/state for acceptance scene
+Phase 7 deliberately does **not** render pixels or encode media. The deterministic semantic backend used by the orchestration CI is a provider-boundary fixture; semantic breadth remains independently guarded by the retained M57 300-case multilingual benchmark. The orchestration layer itself receives natural-language input through the semantic compiler and never requires developer-authored production JSON/state. It does not call `NativeSceneIrLowerer.lowerToLegacyDeterministicScript` or the legacy textual production coordinator.
 
-**DONE gate:** one real natural-language scene, including Armenian-path compatibility, deterministically produces entities, state transitions, validated character/performance/world/camera/lighting state, production-ready timeline and render jobs without manually constructing internal JSON/state.
+**DONE gate:** one Armenian-path natural-language scene deterministically produces canonical entities/state, validated character/performance/world/camera/lighting, a frame-exact production-ready timeline and identity-bound render jobs without manually constructing orchestration state. Proven.
 
 ## PHASE 8 — NATIVE RENDER + MEDIA PIPELINE
 
-❌ Finish browser-free native render to production end-to-end quality: real 3D frame rendering, exact frame timing, native/offscreen surface, safe hardware/software encoding, audio sync, muxing, cancellation, long-export safety and decoder-valid final MP4.
+❌ **THIS IS THE CURRENT MANDATORY TECHNICAL PHASE.**
 
-**DONE gate:** canonical timeline → standards-compatible MP4 with correct duration/frames/audio sync, successful decode-to-EOS verification and no browser/WebView dependency.
+Consume the accepted Phase-7 production timeline/render-job graph and finish the browser-free native render-to-media path.
+
+Close:
+- real 3D frame rendering from canonical Phase-7 state
+- exact frame timing and frame-count preservation
+- native/offscreen render surface
+- safe hardware/software H.264 encoding path
+- audio/dialogue timing and synchronization
+- MP4 muxing
+- cancellation and bounded failure behavior
+- long-export stability
+- decoder-valid final MP4 and decode-to-EOS verification
+- exact source/reference/timeline provenance into the media artifact
+
+**DONE gate:** accepted Phase-7 canonical timeline → standards-compatible MP4 with correct duration/frame count/audio sync, successful decode-to-EOS verification, cancellation/long-export safety and no browser/WebView dependency.
 
 ## PHASE 9 — QC + REPAIR / SELF-HEALING
 
@@ -300,8 +323,9 @@ Checkpoints never replace live verification.
 - Phase 4 `30b0186766b747f4844cba3f4fb91fea4e13349d`: Phase 4 Actor Performance #4 attempt 2 SUCCESS; Foundation #343 SUCCESS; Native Android #102 SUCCESS.
 - Phase 5 `2d9b4e4b38dd4c608a38b90062194f9b162cf61f`: Phase 5 Virtual Director #1 SUCCESS; Foundation #349 SUCCESS; Native Android #108 SUCCESS.
 - Phase 6 `79ca570b1796c43ec134599457051dbf9255c9b1`: Phase 6 World Lighting #4 SUCCESS; Foundation #358 SUCCESS; Native Android #117 SUCCESS; artifact `studio-native-android-79ca570b1796c43ec134599457051dbf9255c9b1`; digest `sha256:dc7151dfde9d74e99b20acf06b595e4ff6cbcc8ebc8403c93670c55e89a354c5`.
+- Phase 7 `7f64b6e9938527e08d766172df6234a0506eff89`: Phase 7 Production Orchestration #1 SUCCESS; Foundation #364 SUCCESS; Native Android #123 SUCCESS; artifact `studio-native-android-7f64b6e9938527e08d766172df6234a0506eff89`; digest `sha256:7711345bf9f9f85b533a2b6da61e472ae3abb0e656e4fd3ef19b6e80206f978d`.
 
-Therefore the active production action is **Phase 7 Scene IR → Full Production Orchestration**.
+Therefore the active production action is **Phase 8 Native Render + Media Pipeline**.
 
 # 10. GOLDEN MOVIE FINAL DEFINITION
 
@@ -320,8 +344,8 @@ When changing the plan, preserve history/rationale, update status/evidence, mirr
 
 # 12. ONE-LINE CANONICAL PATH
 
-**✅ Foundation → ✅ Native M56 → ✅ Semantic M57 → ✅ M58 green 3D → ✅ Character Modeling → ✅ Actor Performance → ✅ Virtual Director/Camera → ✅ Lighting/World → ❌ Full Orchestration → ❌ Native Render/Media → ❌ QC/Repair → ❌ Final Studio UI → ❌ Final Provenance/Security → ❌ Physical Android Certification → ❌ Golden Movie → ❌ v1.0**
+**✅ Foundation → ✅ Native M56 → ✅ Semantic M57 → ✅ M58 green 3D → ✅ Character Modeling → ✅ Actor Performance → ✅ Virtual Director/Camera → ✅ Lighting/World → ✅ Full Orchestration → ❌ Native Render/Media → ❌ QC/Repair → ❌ Final Studio UI → ❌ Final Provenance/Security → ❌ Physical Android Certification → ❌ Golden Movie → ❌ v1.0**
 
 # CURRENT NEXT ACTION
 
-> ❌ **PHASE 7 — connect accepted M57 Scene/Story IR directly to the completed character/performance/world/camera/lighting/timeline/render-job contracts. One real natural-language scene must deterministically become a validated production-ready timeline and render-job graph without developer-authored internal JSON/state. Do not open Phase 8 until the Phase-7 DONE gate is proven.**
+> ❌ **PHASE 8 — consume the accepted Phase-7 frame-exact production timeline/render-job graph and produce a browser-free native standards-compatible MP4 through real 3D frame rendering, exact frame timing, native/offscreen rendering, safe encoding, audio synchronization, muxing, cancellation/long-export safety and decode-to-EOS verification. Do not open Phase 9 until the Phase-8 DONE gate is evidence-proven.**
