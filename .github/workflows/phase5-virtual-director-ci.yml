@@ -1,0 +1,58 @@
+name: Phase 5 Virtual Director CI
+
+on:
+  push:
+    branches: ["m58/**"]
+    paths:
+      - "apps/studio-runtime-android/**"
+      - ".github/workflows/phase5-virtual-director-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/studio-runtime-android/**"
+      - ".github/workflows/phase5-virtual-director-ci.yml"
+
+jobs:
+  verify-phase5-virtual-director:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android 16 platform
+        run: yes | sdkmanager "platforms;android-36"
+
+      - name: Capture exact source identity
+        run: |
+          SOURCE_SHA="$GITHUB_SHA"
+          SOURCE_DATE="$(git show -s --format=%cI "$SOURCE_SHA")"
+          echo "AISTUDIO_SOURCE_SHA=$SOURCE_SHA" >> "$GITHUB_ENV"
+          echo "AISTUDIO_SOURCE_DATE=$SOURCE_DATE" >> "$GITHUB_ENV"
+
+      - name: Phase 5 deterministic virtual director and camera continuity gate
+        working-directory: apps/studio-runtime-android
+        run: |
+          ./gradlew \
+            :app:testReleaseUnitTest \
+            --tests "com.aianimationstudio.runtime.NativeVirtualDirectorPhase5Test" \
+            -PstudioCommitSha="${AISTUDIO_SOURCE_SHA}" \
+            -PstudioSourceDate="${AISTUDIO_SOURCE_DATE}" \
+            -PruntimeVersion="0.7.0-phase5-ci+${AISTUDIO_SOURCE_SHA:0:12}" \
+            -PruntimeVersionCode="${GITHUB_RUN_NUMBER}" \
+            --no-daemon
+
+      - name: Phase 5 contract summary
+        run: |
+          echo "Phase 5 gate PASS on exact SHA ${AISTUDIO_SOURCE_SHA}"
+          echo "Verified: one accepted Phase-4 master performance drives multiple deterministic cinematic shots with shot-size/lens language, tracking/orbit/pan/dolly/static camera motion, intent-based coverage selection, bounded subject framing, actor/explicit-target clearance, stable eyeline screen side, continuity-safe timing, and deterministic identical camera plans on replay."
