@@ -17,18 +17,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Engineering-only 10-second visual proof: Bim walks through a warm home interior. */
+/** Engineering-only visual proof: Bim walks through a warm home interior. */
 @RunWith(AndroidJUnit4::class)
 class NativePhase8BimHomeWalkInstrumentedTest {
     private val prompt =
-        "Բիմը քայլում է իր տան միջով դեպի գրքերի դարակը, կանգնում է, շրջվում է դեպի դարակը, նայում է գրքին, վերցնում է գիրքը և վերջում ուրախ արձագանքում։ 10 վայրկյան 320x240 30 fps"
+        "Բիմը քայլում է իր տան միջով դեպի գրքերի դարակը, կանգնում է, նայում է գրքին, վերցնում է գիրքը և վերջում ուրախ արձագանքում։ 10 վայրկյան 320x240 30 fps"
 
     private val backend = NativeSceneSemanticBackend { request ->
         NativeSceneSemanticDocument(
             detectedLanguage = NativeSceneLanguage.ARMENIAN,
             normalizedText = request.originalText.trim(),
             provider = "PHASE8_BIM_HOME_WALK_PROOF",
-            model = "phase8-bim-home-walk-v2",
+            model = "phase8-bim-home-walk-v3",
             output = NativeSceneOutput(
                 width = 320,
                 height = 240,
@@ -46,12 +46,6 @@ class NativePhase8BimHomeWalkInstrumentedTest {
                     concept = NativeSceneConcept.WAIT,
                     actorId = request.actorId,
                     sourceExcerpt = "կանգնում է",
-                ),
-                NativeSceneActionDraft(
-                    concept = NativeSceneConcept.TURN_TO,
-                    actorId = request.actorId,
-                    targetId = "bookshelf",
-                    sourceExcerpt = "շրջվում է դեպի դարակը",
                 ),
                 NativeSceneActionDraft(
                     concept = NativeSceneConcept.LOOK_AT,
@@ -209,7 +203,7 @@ class NativePhase8BimHomeWalkInstrumentedTest {
         )
     }
 
-    /** Replaces only the renderer's exact flat background colors, preserving the native character pixels. */
+    /** Replaces only the native renderer's exact flat background colors. */
     private fun applyWarmHomeBackdrop(bitmap: Bitmap) {
         val backdrop = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(backdrop)
@@ -218,12 +212,8 @@ class NativePhase8BimHomeWalkInstrumentedTest {
         canvas.drawColor(Color.rgb(231, 207, 169))
         paint.color = Color.rgb(196, 136, 79)
         canvas.drawRect(0f, bitmap.height * 0.72f, bitmap.width.toFloat(), bitmap.height.toFloat(), paint)
-        paint.color = Color.rgb(155, 96, 54)
-        for (x in 0 until bitmap.width step 42) {
-            canvas.drawRect(x.toFloat(), bitmap.height * 0.72f, (x + 2).toFloat(), bitmap.height.toFloat(), paint)
-        }
 
-        // Bookshelf on the left.
+        // Bookshelf.
         paint.color = Color.rgb(112, 73, 48)
         canvas.drawRoundRect(12f, 44f, 78f, 174f, 6f, 6f, paint)
         paint.color = Color.rgb(177, 121, 69)
@@ -231,7 +221,10 @@ class NativePhase8BimHomeWalkInstrumentedTest {
         paint.color = Color.rgb(91, 57, 38)
         listOf(82f, 112f, 142f).forEach { y -> canvas.drawRect(18f, y, 72f, y + 4f, paint) }
         val bookColors = listOf(
-            Color.rgb(74, 124, 153), Color.rgb(166, 82, 68), Color.rgb(89, 137, 92), Color.rgb(219, 172, 75),
+            Color.rgb(74, 124, 153),
+            Color.rgb(166, 82, 68),
+            Color.rgb(89, 137, 92),
+            Color.rgb(219, 172, 75),
         )
         var bx = 22f
         repeat(8) { index ->
@@ -240,9 +233,7 @@ class NativePhase8BimHomeWalkInstrumentedTest {
             bx += 6f
         }
 
-        // Bright window on the right.
-        paint.color = Color.rgb(246, 236, 201)
-        canvas.drawRect(247f, 38f, 306f, 116f, paint)
+        // Window.
         paint.color = Color.rgb(129, 185, 196)
         canvas.drawRect(252f, 43f, 301f, 111f, paint)
         paint.color = Color.rgb(245, 220, 132)
@@ -251,7 +242,7 @@ class NativePhase8BimHomeWalkInstrumentedTest {
         canvas.drawRect(275f, 43f, 279f, 111f, paint)
         canvas.drawRect(252f, 76f, 301f, 80f, paint)
 
-        // Rug and small side table.
+        // Rug and side table.
         paint.color = Color.rgb(173, 74, 67)
         canvas.drawOval(95f, 188f, 244f, 228f, paint)
         paint.color = Color.rgb(98, 63, 42)
@@ -272,6 +263,7 @@ class NativePhase8BimHomeWalkInstrumentedTest {
         backdrop.recycle()
     }
 
+    /** Programmatic Bim reference used only to drive the current palette/reconstruction path. */
     private fun createBimReferenceImage(file: File) {
         val bitmap = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
@@ -338,7 +330,9 @@ class NativePhase8BimHomeWalkInstrumentedTest {
         left.indices.forEach { index ->
             val a = left[index]
             val b = right[index]
-            val delta = abs(Color.red(a) - Color.red(b)) + abs(Color.green(a) - Color.green(b)) + abs(Color.blue(a) - Color.blue(b))
+            val delta = abs(Color.red(a) - Color.red(b)) +
+                abs(Color.green(a) - Color.green(b)) +
+                abs(Color.blue(a) - Color.blue(b))
             if (delta >= 36) changed += 1
         }
         return changed.toDouble() / left.size.toDouble()
