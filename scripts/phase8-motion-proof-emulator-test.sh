@@ -41,14 +41,27 @@ mkdir -p phase8-visual-artifact
 adb shell test -d "$REMOTE_DIR"
 adb pull "$REMOTE_DIR/." phase8-visual-artifact/
 
-FRAME_DIR="phase8-visual-artifact/phase8-motion-frames"
-test -d "$FRAME_DIR"
-FRAME_COUNT="$(find "$FRAME_DIR" -maxdepth 1 -type f -name 'frame-*.png' | wc -l | tr -d ' ')"
-test "$FRAME_COUNT" = "168"
-test -s phase8-visual-artifact/phase8-motion-manifest.txt
-command -v ffmpeg >/dev/null
-command -v ffprobe >/dev/null
+echo "Pulled Phase-8 motion proof tree:"
+find phase8-visual-artifact -maxdepth 3 -type f -print | sort | head -n 220
 
+FRAME_DIR="$(find phase8-visual-artifact -type d -name 'phase8-motion-frames' -print -quit)"
+MANIFEST="$(find phase8-visual-artifact -type f -name 'phase8-motion-manifest.txt' -print -quit)"
+test -n "$FRAME_DIR"
+test -d "$FRAME_DIR"
+test -n "$MANIFEST"
+test -s "$MANIFEST"
+FRAME_COUNT="$(find "$FRAME_DIR" -maxdepth 1 -type f -name 'frame-*.png' | wc -l | tr -d '[:space:]')"
+echo "Locked-camera native frame count: $FRAME_COUNT"
+test "$FRAME_COUNT" = "168"
+
+if ! command -v ffmpeg >/dev/null 2>&1 || ! command -v ffprobe >/dev/null 2>&1; then
+  sudo apt-get update -qq
+  sudo apt-get install -y ffmpeg
+fi
+command -v ffmpeg
+command -v ffprobe
+
+cp "$MANIFEST" phase8-visual-artifact/phase8-motion-manifest.txt
 MOTION_MP4="phase8-visual-artifact/phase8-character-motion-${SOURCE_SHA:0:12}.mp4"
 MOTION_GIF="phase8-visual-artifact/phase8-character-motion-${SOURCE_SHA:0:12}.gif"
 
@@ -65,9 +78,11 @@ ffmpeg -y -hide_banner -loglevel error \
   -loop 0 \
   "$MOTION_GIF"
 
-ENCODED_FRAMES="$(ffprobe -v error -select_streams v:0 -count_frames -show_entries stream=nb_read_frames -of default=nw=1:nk=1 "$MOTION_MP4")"
+ENCODED_FRAMES="$(ffprobe -v error -select_streams v:0 -count_frames -show_entries stream=nb_read_frames -of default=nw=1:nk=1 "$MOTION_MP4" | tr -d '[:space:]')"
+echo "Encoded motion frame count: $ENCODED_FRAMES"
 test "$ENCODED_FRAMES" = "168"
-AUDIO_STREAMS="$(ffprobe -v error -select_streams a -show_entries stream=index -of csv=p=0 "$MOTION_MP4" | sed '/^$/d' | wc -l | tr -d ' ')"
+AUDIO_STREAMS="$(ffprobe -v error -select_streams a -show_entries stream=index -of csv=p=0 "$MOTION_MP4" | sed '/^$/d' | wc -l | tr -d '[:space:]')"
+echo "Audio stream count: $AUDIO_STREAMS"
 test "$AUDIO_STREAMS" = "0"
 
 test -s "$MOTION_MP4"
