@@ -35,10 +35,25 @@ class NativePhase8VisualAnimationInstrumentedTest {
                 durationSeconds = 14.0,
             ),
             actions = listOf(
-                NativeSceneActionDraft(NativeSceneConcept.WALK_TO, request.actorId, "prop_box", "քայլում է դեպի տուփը"),
+                NativeSceneActionDraft(
+                    concept = NativeSceneConcept.WALK_TO,
+                    actorId = request.actorId,
+                    targetId = "prop_box",
+                    sourceExcerpt = "քայլում է դեպի տուփը",
+                ),
                 NativeSceneActionDraft(NativeSceneConcept.WAIT, request.actorId, sourceExcerpt = "կանգնում է"),
-                NativeSceneActionDraft(NativeSceneConcept.LOOK_AT, request.actorId, "prop_box", "նայում է տուփին"),
-                NativeSceneActionDraft(NativeSceneConcept.PICK_UP, request.actorId, "prop_box", "վերցնում է այն"),
+                NativeSceneActionDraft(
+                    concept = NativeSceneConcept.LOOK_AT,
+                    actorId = request.actorId,
+                    targetId = "prop_box",
+                    sourceExcerpt = "նայում է տուփին",
+                ),
+                NativeSceneActionDraft(
+                    concept = NativeSceneConcept.PICK_UP,
+                    actorId = request.actorId,
+                    targetId = "prop_box",
+                    sourceExcerpt = "վերցնում է այն",
+                ),
                 NativeSceneActionDraft(NativeSceneConcept.REACT, request.actorId, sourceExcerpt = "արձագանքում"),
                 NativeSceneActionDraft(NativeSceneConcept.ENVIRONMENT_CHANGE, request.actorId, sourceExcerpt = "փոխիր միջավայրը"),
                 NativeSceneActionDraft(NativeSceneConcept.LIGHTING_CHANGE, request.actorId, sourceExcerpt = "լույսը"),
