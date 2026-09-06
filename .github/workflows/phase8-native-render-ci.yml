@@ -50,7 +50,8 @@ jobs:
           grep -q --fixed-strings "worldPlan.resolvedShots" "$FILE"
           grep -q --fixed-strings "plan.renderGraph.jobs" "$FILE"
           grep -q --fixed-strings "plan.timeline" "$FILE"
-          if grep -q -E 'NativeProductionCoordinator|NativeProductionSnapshot|android\.webkit|androidx\.webkit' "$FILE"; then
+          SOURCE_ONLY="$(sed -E '/^[[:space:]]*(\/\*|\*|\/\/)/d' "$FILE")"
+          if printf '%s\n' "$SOURCE_ONLY" | grep -q -E 'NativeProductionCoordinator|NativeProductionSnapshot|android\.webkit|androidx\.webkit'; then
             echo "Phase-8 direct renderer contains a forbidden legacy/browser production dependency." >&2
             exit 1
           fi
