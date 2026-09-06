@@ -43,6 +43,7 @@ android {
         targetSdk = 36
         versionCode = runtimeVersionCode.get()
         versionName = runtimeVersion.get()
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "STUDIO_REPOSITORY", quotedBuildConfig("tigpetryan-rgb/AI-Animation-Studio"))
         buildConfigField("String", "STUDIO_COMMIT_SHA", quotedBuildConfig(studioCommitSha.get()))
@@ -90,4 +91,6 @@ dependencies {
     implementation("androidx.media3:media3-muxer:1.11.0")
 
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
 }

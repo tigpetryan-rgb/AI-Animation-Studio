@@ -1,0 +1,80 @@
+name: Phase 8 Visual Animation Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["m58/**"]
+    paths:
+      - "apps/studio-runtime-android/app/build.gradle.kts"
+      - "apps/studio-runtime-android/app/src/androidTest/java/com/aianimationstudio/runtime/NativePhase8VisualAnimationInstrumentedTest.kt"
+      - ".github/workflows/phase8-visual-animation-test.yml"
+
+jobs:
+  render-viewable-native-animation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Enable KVM permissions
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Render actual Phase 8 3D animation in Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            set -euo pipefail
+            SOURCE_SHA="$GITHUB_SHA"
+            SOURCE_DATE="$(git show -s --format=%cI "$SOURCE_SHA")"
+            cd apps/studio-runtime-android
+            ./gradlew \
+              :app:connectedDebugAndroidTest \
+              -PstudioCommitSha="$SOURCE_SHA" \
+              -PstudioSourceDate="$SOURCE_DATE" \
+              -PruntimeVersion="0.10.2-phase8-visual+${SOURCE_SHA:0:12}" \
+              -PruntimeVersionCode="$GITHUB_RUN_NUMBER" \
+              --no-daemon
+            cd ../..
+            mkdir -p phase8-visual-artifact
+            adb pull /sdcard/Android/data/com.aianimationstudio.runtime/files/Movies/. phase8-visual-artifact/
+
+      - name: Verify visual artifact bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          MP4="$(find phase8-visual-artifact -maxdepth 1 -type f -name 'phase8-visual-*.mp4' | head -n 1)"
+          test -n "$MP4"
+          test -s "$MP4"
+          test -s phase8-visual-artifact/phase8-visual-preview-1.png
+          test -s phase8-visual-artifact/phase8-visual-preview-2.png
+          test -s phase8-visual-artifact/phase8-visual-preview-3.png
+          test -s phase8-visual-artifact/phase8-visual-manifest.txt
+          sha256sum "$MP4"
+          cat phase8-visual-artifact/phase8-visual-manifest.txt
+
+      - name: Upload viewable Phase 8 animation
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase8-visual-animation-${{ github.sha }}
+          path: phase8-visual-artifact/
+          if-no-files-found: error
+          retention-days: 14
