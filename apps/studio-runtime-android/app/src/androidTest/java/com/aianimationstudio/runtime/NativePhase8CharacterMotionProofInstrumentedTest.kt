@@ -24,22 +24,25 @@ import org.junit.runner.RunWith
  * the motion gate. Every PNG is rendered by the real native skinned-mesh renderer from the accepted
  * Phase-7 plan. Host CI later packages these exact frames into a broadly playable video-only MP4/GIF.
  * Audio is explicitly outside this proof.
+ *
+ * This proof intentionally runs at 30 FPS so each displayed frame is independently sampled from the
+ * canonical native performance. No host-side frame interpolation is allowed to manufacture motion.
  */
 @RunWith(AndroidJUnit4::class)
 class NativePhase8CharacterMotionProofInstrumentedTest {
     private val prompt =
-        "Դերասանը քայլում է դեպի տուփը, կանգնում է, նայում է տուփին, վերցնում է այն և արձագանքում։ 14 վայրկյան 320x240 12 fps"
+        "Դերասանը քայլում է դեպի տուփը, կանգնում է, նայում է տուփին, վերցնում է այն և արձագանքում։ 14 վայրկյան 320x240 30 fps"
 
     private val backend = NativeSceneSemanticBackend { request ->
         NativeSceneSemanticDocument(
             detectedLanguage = NativeSceneLanguage.ARMENIAN,
             normalizedText = request.originalText.trim(),
             provider = "PHASE8_CHARACTER_MOTION_PROOF",
-            model = "phase8-fixed-camera-motion-proof-v1",
+            model = "phase8-fixed-camera-motion-proof-v2-30fps",
             output = NativeSceneOutput(
                 width = 320,
                 height = 240,
-                frameRate = 12.0,
+                frameRate = 30.0,
                 durationSeconds = 14.0,
             ),
             actions = listOf(
@@ -109,8 +112,8 @@ class NativePhase8CharacterMotionProofInstrumentedTest {
         )
         val plan = requirePhase7Ready(orchestration)
         assertTrue("Phase-7 acceptance must be DONE before character-motion proof.", plan.acceptance.done)
-        assertEquals(168, plan.timeline.totalFrames)
-        assertEquals(12.0, plan.timeline.frameRate, 0.0)
+        assertEquals(420, plan.timeline.totalFrames)
+        assertEquals(30.0, plan.timeline.frameRate, 0.0)
 
         val bound = when (val result = NativePhase8RenderBinder.bind(plan)) {
             is NativePhase8RenderBindingResult.Ready -> result.plan
@@ -118,7 +121,7 @@ class NativePhase8CharacterMotionProofInstrumentedTest {
                 "Phase-8 binding rejected before character-motion proof: ${diagnostics(result.diagnostics)}",
             )
         }
-        assertEquals(168, bound.frames.size)
+        assertEquals(420, bound.frames.size)
 
         val maxRotationMagnitude = bound.performance.tracks
             .flatMap { it.keyframes }
@@ -137,7 +140,7 @@ class NativePhase8CharacterMotionProofInstrumentedTest {
         val initialCamera = NativePhase8RenderBinder.sampleCamera(bound.frames.first())
         val fixedCamera = closerCamera(initialCamera, 0.78)
         val target = Bitmap.createBitmap(bound.width, bound.height, Bitmap.Config.ARGB_8888)
-        val probeIndices = setOf(0, 10, 20, 72, 94, 167)
+        val probeIndices = setOf(0, 25, 50, 180, 235, 419)
         val probes = linkedMapOf<Int, IntArray>()
 
         try {
@@ -167,7 +170,7 @@ class NativePhase8CharacterMotionProofInstrumentedTest {
             if (!decodedReference.isRecycled) decodedReference.recycle()
         }
 
-        assertEquals("Motion proof must render all 168 fixed-camera frames.", 168, frameDir.listFiles()?.size ?: 0)
+        assertEquals("Motion proof must render all 420 fixed-camera frames.", 420, frameDir.listFiles()?.size ?: 0)
         assertEquals("All requested motion probes must be rendered.", probeIndices.size, probes.size)
         val firstProbe = checkNotNull(probes[0])
         val maxChangedFraction = probes
@@ -185,6 +188,7 @@ class NativePhase8CharacterMotionProofInstrumentedTest {
                 appendLine("audioTested=false")
                 appendLine("cameraMode=LOCKED_PHASE8_FIRST_CAMERA")
                 appendLine("cameraDistanceScale=0.78")
+                appendLine("samplingMode=NATIVE_RENDERER_30FPS_NO_HOST_INTERPOLATION")
                 appendLine("sourceCommit=${BuildConfig.STUDIO_COMMIT_SHA}")
                 appendLine("referenceSha256=$referenceSha")
                 appendLine("scriptSha256=${plan.ir.scriptSha256}")

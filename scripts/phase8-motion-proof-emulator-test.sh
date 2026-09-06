@@ -15,7 +15,7 @@ cd apps/studio-runtime-android
   :app:assembleDebugAndroidTest \
   -PstudioCommitSha="$SOURCE_SHA" \
   -PstudioSourceDate="$SOURCE_DATE" \
-  -PruntimeVersion="0.10.3-phase8-motion+${SOURCE_SHA:0:12}" \
+  -PruntimeVersion="0.10.4-phase8-motion30+${SOURCE_SHA:0:12}" \
   -PruntimeVersionCode="$RUN_NUMBER" \
   --no-daemon
 
@@ -42,7 +42,7 @@ adb shell test -d "$REMOTE_DIR"
 adb pull "$REMOTE_DIR/." phase8-visual-artifact/
 
 echo "Pulled Phase-8 motion proof tree:"
-find phase8-visual-artifact -maxdepth 3 -type f -print | sort | head -n 220
+find phase8-visual-artifact -maxdepth 3 -type f -print | sort | head -n 500
 
 FRAME_DIR="$(find phase8-visual-artifact -type d -name 'phase8-motion-frames' -print -quit)"
 MANIFEST="$(find phase8-visual-artifact -type f -name 'phase8-motion-manifest.txt' -print -quit)"
@@ -52,7 +52,7 @@ test -n "$MANIFEST"
 test -s "$MANIFEST"
 FRAME_COUNT="$(find "$FRAME_DIR" -maxdepth 1 -type f -name 'frame-*.png' | wc -l | tr -d '[:space:]')"
 echo "Locked-camera native frame count: $FRAME_COUNT"
-test "$FRAME_COUNT" = "168"
+test "$FRAME_COUNT" = "420"
 
 if ! command -v ffmpeg >/dev/null 2>&1 || ! command -v ffprobe >/dev/null 2>&1; then
   sudo apt-get update -qq
@@ -68,22 +68,27 @@ fi
 MOTION_MP4="phase8-visual-artifact/phase8-character-motion-${SOURCE_SHA:0:12}.mp4"
 MOTION_GIF="phase8-visual-artifact/phase8-character-motion-${SOURCE_SHA:0:12}.gif"
 
+# Encode only frames genuinely rendered by the Android native renderer. No minterpolate/fps synthesis.
 ffmpeg -y -hide_banner -loglevel error \
-  -framerate 12 -start_number 0 -i "$FRAME_DIR/frame-%03d.png" \
+  -framerate 30 -start_number 0 -i "$FRAME_DIR/frame-%03d.png" \
   -c:v libx264 -preset medium -crf 18 \
   -pix_fmt yuv420p -profile:v baseline -level 3.0 \
-  -movflags +faststart -an \
+  -g 30 -keyint_min 30 -sc_threshold 0 \
+  -movflags +faststart -tag:v avc1 -an \
   "$MOTION_MP4"
 
 ffmpeg -y -hide_banner -loglevel error \
   -i "$MOTION_MP4" \
-  -filter_complex "[0:v]fps=12,scale=320:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer:bayer_scale=5" \
+  -filter_complex "[0:v]fps=30,scale=320:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer:bayer_scale=5" \
   -loop 0 \
   "$MOTION_GIF"
 
 ENCODED_FRAMES="$(ffprobe -v error -select_streams v:0 -count_frames -show_entries stream=nb_read_frames -of default=nw=1:nk=1 "$MOTION_MP4" | tr -d '[:space:]')"
 echo "Encoded motion frame count: $ENCODED_FRAMES"
-test "$ENCODED_FRAMES" = "168"
+test "$ENCODED_FRAMES" = "420"
+FRAME_RATE="$(ffprobe -v error -select_streams v:0 -show_entries stream=avg_frame_rate -of default=nw=1:nk=1 "$MOTION_MP4" | tr -d '[:space:]')"
+echo "Encoded average frame rate: $FRAME_RATE"
+test "$FRAME_RATE" = "30/1"
 AUDIO_STREAMS="$(ffprobe -v error -select_streams a -show_entries stream=index -of csv=p=0 "$MOTION_MP4" | sed '/^$/d' | wc -l | tr -d '[:space:]')"
 echo "Audio stream count: $AUDIO_STREAMS"
 test "$AUDIO_STREAMS" = "0"
@@ -91,9 +96,9 @@ test "$AUDIO_STREAMS" = "0"
 test -s "$MOTION_MP4"
 test -s "$MOTION_GIF"
 cp "$FRAME_DIR/frame-000.png" phase8-visual-artifact/phase8-character-preview-1.png
-cp "$FRAME_DIR/frame-010.png" phase8-visual-artifact/phase8-character-preview-2.png
-cp "$FRAME_DIR/frame-072.png" phase8-visual-artifact/phase8-character-preview-3.png
-cp "$FRAME_DIR/frame-094.png" phase8-visual-artifact/phase8-character-preview-4.png
+cp "$FRAME_DIR/frame-025.png" phase8-visual-artifact/phase8-character-preview-2.png
+cp "$FRAME_DIR/frame-180.png" phase8-visual-artifact/phase8-character-preview-3.png
+cp "$FRAME_DIR/frame-235.png" phase8-visual-artifact/phase8-character-preview-4.png
 rm -rf "$FRAME_DIR"
 
 sha256sum "$MOTION_MP4" "$MOTION_GIF" > phase8-visual-artifact/phase8-character-motion.sha256

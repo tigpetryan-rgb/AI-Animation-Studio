@@ -66,7 +66,9 @@ jobs:
           grep -q '^scope=CHARACTER_MOTION_PROOF_VIDEO_ONLY$' phase8-visual-artifact/phase8-motion-manifest.txt
           grep -q '^audioTested=false$' phase8-visual-artifact/phase8-motion-manifest.txt
           grep -q '^cameraMode=LOCKED_PHASE8_FIRST_CAMERA$' phase8-visual-artifact/phase8-motion-manifest.txt
-          grep -q '^frameCount=168$' phase8-visual-artifact/phase8-motion-manifest.txt
+          grep -q '^samplingMode=NATIVE_RENDERER_30FPS_NO_HOST_INTERPOLATION$' phase8-visual-artifact/phase8-motion-manifest.txt
+          grep -q '^frameRate=30.0$' phase8-visual-artifact/phase8-motion-manifest.txt
+          grep -q '^frameCount=420$' phase8-visual-artifact/phase8-motion-manifest.txt
           sha256sum "$MP4" "$GIF"
           cat phase8-visual-artifact/phase8-motion-manifest.txt
 
