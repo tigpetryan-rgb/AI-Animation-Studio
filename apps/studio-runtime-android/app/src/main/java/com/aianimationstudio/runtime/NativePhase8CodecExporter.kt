@@ -465,11 +465,9 @@ private class NativePhase8EglCodecSurface(
             "Unable to choose a recordable EGL config for Phase-8 H.264 input."
         }
         val config = checkNotNull(configs[0])
-        val recordable = IntArray(1)
-        check(
-            EGL14.eglGetConfigAttrib(display, config, EGLExt.EGL_RECORDABLE_ANDROID, recordable, 0) &&
-                recordable[0] == EGL14.EGL_TRUE,
-        ) { "Selected EGL config is not recordable for Phase-8 H.264 input." }
+        // EGL_RECORDABLE_ANDROID is already a hard selection predicate above. Some emulator EGL
+        // implementations do not expose the selected extension attribute reliably via
+        // eglGetConfigAttrib, so actual window-surface creation/submission remains the runtime gate.
 
         val contextAttributes = intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 2, EGL14.EGL_NONE)
         context = EGL14.eglCreateContext(display, config, EGL14.EGL_NO_CONTEXT, contextAttributes, 0)
