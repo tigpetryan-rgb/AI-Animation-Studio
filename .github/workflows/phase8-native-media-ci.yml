@@ -1,0 +1,86 @@
+name: Phase 8 Native Media CI
+
+on:
+  push:
+    branches: ["m58/**"]
+    paths:
+      - "apps/studio-runtime-android/**"
+      - ".github/workflows/phase8-native-media-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/studio-runtime-android/**"
+      - ".github/workflows/phase8-native-media-ci.yml"
+
+jobs:
+  verify-phase8-native-media-binding:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android 16 platform
+        run: yes | sdkmanager "platforms;android-36"
+
+      - name: Capture exact source identity
+        run: |
+          SOURCE_SHA="$GITHUB_SHA"
+          SOURCE_DATE="$(git show -s --format=%cI "$SOURCE_SHA")"
+          echo "AISTUDIO_SOURCE_SHA=$SOURCE_SHA" >> "$GITHUB_ENV"
+          echo "AISTUDIO_SOURCE_DATE=$SOURCE_DATE" >> "$GITHUB_ENV"
+
+      - name: Verify direct Phase 8 render to MediaCodec boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXPORTER="apps/studio-runtime-android/app/src/main/java/com/aianimationstudio/runtime/NativePhase8CodecExporter.kt"
+          CONTRACT="apps/studio-runtime-android/app/src/main/java/com/aianimationstudio/runtime/NativePhase8CodecContract.kt"
+          CAPABILITIES="apps/studio-runtime-android/app/src/main/java/com/aianimationstudio/runtime/NativeCodecCapabilities.kt"
+
+          grep -q --fixed-strings "NativePhase8RenderBinder.bind(production)" "$EXPORTER"
+          grep -q --fixed-strings "NativePhase8FrameRenderer.prepare(production, reference)" "$EXPORTER"
+          grep -q --fixed-strings "NativeCodecCapabilities.probe(contract.codecPlan)" "$EXPORTER"
+          grep -q --fixed-strings "renderer.renderFrame(bitmap, submittedVideoFrames)" "$EXPORTER"
+          grep -q --fixed-strings "frame.presentationTimeUs * 1_000L" "$EXPORTER"
+          grep -q --fixed-strings "NativeMp4Muxer(outputFile)" "$EXPORTER"
+          grep -q --fixed-strings "videoSampleCount == codecPlan.frameCount" "$EXPORTER"
+          grep -q --fixed-strings "SILENCE_PLACEHOLDER_OBJECTIVE_2" "$EXPORTER"
+          grep -q --fixed-strings "fun fromPhase8(bound: NativePhase8BoundRenderPlan)" "$CAPABILITIES"
+          grep -q --fixed-strings "NativeEncoderTiming.videoPresentationTimeUs(codecPlan, frame.frameIndex)" "$CONTRACT"
+
+          if grep -q -E 'NativeProductionSnapshot|NativeProductionCoordinator|android\.webkit|androidx\.webkit' "$EXPORTER" "$CONTRACT"; then
+            echo "Phase-8 media path contains a forbidden legacy/browser production dependency." >&2
+            exit 1
+          fi
+          echo "Direct Phase-7 render DAG -> indexed native 3D frames -> H.264 MediaCodec boundary PASS."
+
+      - name: Phase 8 exact codec contract acceptance gate
+        working-directory: apps/studio-runtime-android
+        run: |
+          ./gradlew \
+            :app:testReleaseUnitTest \
+            --tests "com.aianimationstudio.runtime.NativePhase8CodecContractTest" \
+            --tests "com.aianimationstudio.runtime.NativePhase8RenderPipelineTest" \
+            --tests "com.aianimationstudio.runtime.NativeCodecPlanTest" \
+            -PstudioCommitSha="${AISTUDIO_SOURCE_SHA}" \
+            -PstudioSourceDate="${AISTUDIO_SOURCE_DATE}" \
+            -PruntimeVersion="0.10.1-phase8-media+${AISTUDIO_SOURCE_SHA:0:12}" \
+            -PruntimeVersionCode="${GITHUB_RUN_NUMBER}" \
+            --no-daemon
+
+      - name: Phase 8 objective 2 summary
+        run: |
+          echo "Phase 8 objective 2 PASS on exact SHA ${AISTUDIO_SOURCE_SHA}"
+          echo "Verified: accepted Phase-7 frame identities/count/PTS bind directly to the native 3D renderer and Android H.264 surface encoder, with one encoded video sample required per accepted frame."
+          echo "Audio remains an explicit silence placeholder and therefore this run does NOT satisfy the Phase-8 final A/V DONE gate."
