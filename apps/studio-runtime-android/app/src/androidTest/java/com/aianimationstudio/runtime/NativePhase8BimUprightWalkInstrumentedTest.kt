@@ -44,8 +44,6 @@ class NativePhase8BimUprightWalkInstrumentedTest {
     private val prompt =
         "Բիմը կանգնած դիրքով բնական քայլում է առաջ։ 10 վայրկյան 320x240 30 fps առանց ձայնի"
 
-    // Keep Phase-7 production acceptance structurally complete; the visual proof below isolates
-    // locomotion and renders only the dedicated upright gait.
     private val backend = NativeSceneSemanticBackend { request ->
         NativeSceneSemanticDocument(
             detectedLanguage = NativeSceneLanguage.ARMENIAN,
@@ -69,12 +67,6 @@ class NativePhase8BimUprightWalkInstrumentedTest {
                     concept = NativeSceneConcept.WAIT,
                     actorId = request.actorId,
                     sourceExcerpt = "կանգնած դիրքով",
-                ),
-                NativeSceneActionDraft(
-                    concept = NativeSceneConcept.TURN_TO,
-                    actorId = request.actorId,
-                    targetId = "walk_mark",
-                    sourceExcerpt = "առաջ",
                 ),
                 NativeSceneActionDraft(
                     concept = NativeSceneConcept.LOOK_AT,
@@ -392,8 +384,6 @@ class NativePhase8BimUprightWalkInstrumentedTest {
             }
         }
 
-        // Bim silhouette: turquoise rounded body/head, cream face mask, long side ears,
-        // short planted legs, dark expressive eyes/mouth and the gold chest medallion.
         addEllipsoid(
             NativeStagePoint(0.0, 1.03, 0.0),
             NativeStagePoint(0.47, 0.56, 0.34),
@@ -442,9 +432,6 @@ class NativePhase8BimUprightWalkInstrumentedTest {
             NativeSemanticBoneRole.HEAD,
             NativeMaterialSlot3D.BODY,
         )
-
-        // Arm + hand are one rigid stylized limb per side so the current native renderer can
-        // produce a clean opposite-arm swing without limb disconnection.
         addEllipsoid(
             NativeStagePoint(-0.53, 0.94, 0.0),
             NativeStagePoint(0.145, 0.34, 0.145),
@@ -469,9 +456,6 @@ class NativePhase8BimUprightWalkInstrumentedTest {
             NativeSemanticBoneRole.RIGHT_UPPER_ARM,
             NativeMaterialSlot3D.BODY,
         )
-
-        // Leg + foot are also rigid per side. Their shared upper-leg pivot makes the physical
-        // bottom point obey the analytic planted-foot constraint used by the gait root solver.
         addEllipsoid(
             NativeStagePoint(-0.20, 0.31, 0.0),
             NativeStagePoint(0.155, 0.28, 0.145),
@@ -496,7 +480,6 @@ class NativePhase8BimUprightWalkInstrumentedTest {
             NativeSemanticBoneRole.RIGHT_UPPER_LEG,
             NativeMaterialSlot3D.BODY,
         )
-
         addEllipsoid(
             NativeStagePoint(0.0, 0.94, 0.35),
             NativeStagePoint(0.145, 0.145, 0.050),
@@ -556,7 +539,6 @@ class NativePhase8BimUprightWalkInstrumentedTest {
         paint.color = Color.rgb(189, 171, 145)
         canvas.drawRect(0f, floorTop, bitmap.width.toFloat(), bitmap.height.toFloat(), paint)
 
-        // Static high-contrast floor evidence: any sliding foot is obvious against these marks.
         paint.color = Color.rgb(137, 119, 96)
         paint.strokeWidth = 1.5f
         listOf(0.84f, 0.90f, 0.96f).forEach { fraction ->
