@@ -21,14 +21,14 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class NativePhase8BimHomeWalkInstrumentedTest {
     private val prompt =
-        "Բիմը քայլում է իր տան միջով դեպի գրքերի դարակը, նայում է դարակին և վերջում ուրախ արձագանքում։ 10 վայրկյան 320x240 30 fps"
+        "Բիմը քայլում է իր տան միջով դեպի գրքերի դարակը, կանգնում է, շրջվում է դեպի դարակը, նայում է գրքին, վերցնում է գիրքը և վերջում ուրախ արձագանքում։ 10 վայրկյան 320x240 30 fps"
 
     private val backend = NativeSceneSemanticBackend { request ->
         NativeSceneSemanticDocument(
             detectedLanguage = NativeSceneLanguage.ARMENIAN,
             normalizedText = request.originalText.trim(),
             provider = "PHASE8_BIM_HOME_WALK_PROOF",
-            model = "phase8-bim-home-walk-v1",
+            model = "phase8-bim-home-walk-v2",
             output = NativeSceneOutput(
                 width = 320,
                 height = 240,
@@ -43,10 +43,27 @@ class NativePhase8BimHomeWalkInstrumentedTest {
                     sourceExcerpt = "քայլում է իր տան միջով դեպի գրքերի դարակը",
                 ),
                 NativeSceneActionDraft(
-                    concept = NativeSceneConcept.LOOK_AT,
+                    concept = NativeSceneConcept.WAIT,
+                    actorId = request.actorId,
+                    sourceExcerpt = "կանգնում է",
+                ),
+                NativeSceneActionDraft(
+                    concept = NativeSceneConcept.TURN_TO,
                     actorId = request.actorId,
                     targetId = "bookshelf",
-                    sourceExcerpt = "նայում է դարակին",
+                    sourceExcerpt = "շրջվում է դեպի դարակը",
+                ),
+                NativeSceneActionDraft(
+                    concept = NativeSceneConcept.LOOK_AT,
+                    actorId = request.actorId,
+                    targetId = "book",
+                    sourceExcerpt = "նայում է գրքին",
+                ),
+                NativeSceneActionDraft(
+                    concept = NativeSceneConcept.PICK_UP,
+                    actorId = request.actorId,
+                    targetId = "book",
+                    sourceExcerpt = "վերցնում է գիրքը",
                 ),
                 NativeSceneActionDraft(
                     concept = NativeSceneConcept.REACT,
