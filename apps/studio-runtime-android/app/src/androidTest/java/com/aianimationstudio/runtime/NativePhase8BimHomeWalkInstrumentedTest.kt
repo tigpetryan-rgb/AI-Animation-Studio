@@ -21,14 +21,14 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class NativePhase8BimHomeWalkInstrumentedTest {
     private val prompt =
-        "Բիմը քայլում է իր տան միջով դեպի գրքերի դարակը, կանգնում է, նայում է գրքին, վերցնում է գիրքը և վերջում ուրախ արձագանքում։ 10 վայրկյան 320x240 30 fps"
+        "Բիմը քայլում է իր տան միջով դեպի դարակի մոտ գտնվող գիրքը, կանգնում է, նայում է գրքին, վերցնում է գիրքը և վերջում ուրախ արձագանքում։ 10 վայրկյան 320x240 30 fps"
 
     private val backend = NativeSceneSemanticBackend { request ->
         NativeSceneSemanticDocument(
             detectedLanguage = NativeSceneLanguage.ARMENIAN,
             normalizedText = request.originalText.trim(),
             provider = "PHASE8_BIM_HOME_WALK_PROOF",
-            model = "phase8-bim-home-walk-v3",
+            model = "phase8-bim-home-walk-v4",
             output = NativeSceneOutput(
                 width = 320,
                 height = 240,
@@ -39,8 +39,8 @@ class NativePhase8BimHomeWalkInstrumentedTest {
                 NativeSceneActionDraft(
                     concept = NativeSceneConcept.WALK_TO,
                     actorId = request.actorId,
-                    targetId = "bookshelf",
-                    sourceExcerpt = "քայլում է իր տան միջով դեպի գրքերի դարակը",
+                    targetId = "book",
+                    sourceExcerpt = "քայլում է իր տան միջով դեպի դարակի մոտ գտնվող գիրքը",
                 ),
                 NativeSceneActionDraft(
                     concept = NativeSceneConcept.WAIT,
