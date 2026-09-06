@@ -89,10 +89,9 @@ class NativePhase8VisualAnimationInstrumentedTest {
             sourceCommit = BuildConfig.STUDIO_COMMIT_SHA,
             backend = backend,
         )
-        assertTrue(orchestration is NativePhase7OrchestrationResult.Ready)
-        val plan = (orchestration as NativePhase7OrchestrationResult.Ready).plan
-        assertTrue(plan.acceptance.done)
-        assertEquals(168, plan.timeline.totalFrames)
+        val plan = requirePhase7Ready(orchestration)
+        assertTrue("Phase-7 production acceptance must be DONE before visual encoding.", plan.acceptance.done)
+        assertEquals("Visual fixture must bind exactly 168 frames.", 168, plan.timeline.totalFrames)
 
         val output = File(outputDir, "phase8-visual-${BuildConfig.STUDIO_COMMIT_SHA.take(12)}.mp4")
         val encoded = NativePhase8MediaCodecExporter.encode(
@@ -100,19 +99,18 @@ class NativePhase8VisualAnimationInstrumentedTest {
             reference = reference,
             outputFile = output,
         )
-        assertTrue(encoded is NativePhase8CodecEncodingResult.Ready)
-        val artifact = (encoded as NativePhase8CodecEncodingResult.Ready).artifact
-        assertTrue(output.isFile && output.length() > 0L)
-        assertEquals(168, artifact.frameCount)
-        assertEquals(168, artifact.videoSampleCount)
+        val artifact = requireCodecReady(encoded)
+        assertTrue("Phase-8 encoder returned Ready without a non-empty MP4 file.", output.isFile && output.length() > 0L)
+        assertEquals("Phase-8 artifact frame count drifted.", 168, artifact.frameCount)
+        assertEquals("Phase-8 H.264 sample count drifted.", 168, artifact.videoSampleCount)
         assertEquals(NativePhase8AudioMode.SILENCE_PLACEHOLDER_OBJECTIVE_2, artifact.audioMode)
 
         val videoSamples = countVideoSamples(output)
-        assertEquals(168, videoSamples)
+        assertEquals("Saved MP4 H.264 sample count drifted.", 168, videoSamples)
 
         val previewFiles = extractPreviewFrames(output, outputDir)
-        assertEquals(3, previewFiles.size)
-        assertTrue(previewFiles.all { it.isFile && it.length() > 0L })
+        assertEquals("Visual evidence bundle must contain exactly three decoded previews.", 3, previewFiles.size)
+        assertTrue("Every decoded preview must be a non-empty PNG.", previewFiles.all { it.isFile && it.length() > 0L })
         val previewHashes = previewFiles.map(::sha256)
         assertTrue("Rendered preview frames must show visual change across the animation.", previewHashes.toSet().size >= 2)
 
@@ -133,6 +131,24 @@ class NativePhase8VisualAnimationInstrumentedTest {
             },
         )
     }
+
+    private fun requirePhase7Ready(result: NativePhase7OrchestrationResult): NativePhase7ProductionPlan = when (result) {
+        is NativePhase7OrchestrationResult.Ready -> result.plan
+        is NativePhase7OrchestrationResult.Rejected -> throw AssertionError(
+            "Phase-7 orchestration rejected before visual encoding: ${diagnostics(result.diagnostics)}",
+        )
+    }
+
+    private fun requireCodecReady(result: NativePhase8CodecEncodingResult): NativePhase8EncodedMp4Artifact = when (result) {
+        is NativePhase8CodecEncodingResult.Ready -> result.artifact
+        is NativePhase8CodecEncodingResult.Rejected -> throw AssertionError(
+            "Phase-8 codec rejected before MP4 artifact creation: ${diagnostics(result.diagnostics)}",
+        )
+    }
+
+    private fun diagnostics(values: List<NativeDiagnostic>): String = values.joinToString(" | ") { diagnostic ->
+        "${diagnostic.code}: ${diagnostic.message}"
+    }.ifBlank { "no diagnostics returned" }
 
     private fun createReferenceImage(file: File) {
         val bitmap = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
