@@ -1,0 +1,77 @@
+name: Phase 8 Bim Home Visual Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["m58/**"]
+    paths:
+      - "apps/studio-runtime-android/app/src/androidTest/java/com/aianimationstudio/runtime/NativePhase8BimHomeWalkInstrumentedTest.kt"
+      - "scripts/phase8-bim-home-emulator-test.sh"
+      - ".github/workflows/phase8-bim-home-visual-test.yml"
+
+jobs:
+  render-bim-home-animation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Enable KVM permissions
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Render Bim home walk in Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader -no-snapshot -noaudio -no-boot-anim
+          script: bash scripts/phase8-bim-home-emulator-test.sh
+
+      - name: Verify Bim home artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          MP4="$(find phase8-bim-home-artifact -maxdepth 1 -type f -name 'phase8-bim-home-*.mp4' | head -n 1)"
+          WEBP="$(find phase8-bim-home-artifact -maxdepth 1 -type f -name 'phase8-bim-home-*.webp' | head -n 1)"
+          test -n "$MP4" && test -s "$MP4"
+          test -n "$WEBP" && test -s "$WEBP"
+          test -s phase8-bim-home-artifact/bim-preview-1.png
+          test -s phase8-bim-home-artifact/bim-preview-2.png
+          test -s phase8-bim-home-artifact/bim-preview-3.png
+          test -s phase8-bim-home-artifact/bim-preview-4.png
+          test -s phase8-bim-home-artifact/bim-preview-5.png
+          test -s phase8-bim-home-artifact/phase8-bim-home-manifest.txt
+          grep -q '^scope=BIM_HOME_WALK_VIDEO_ONLY$' phase8-bim-home-artifact/phase8-bim-home-manifest.txt
+          grep -q '^character=BIM$' phase8-bim-home-artifact/phase8-bim-home-manifest.txt
+          grep -q '^durationSeconds=10.0$' phase8-bim-home-artifact/phase8-bim-home-manifest.txt
+          grep -q '^frameRate=30.0$' phase8-bim-home-artifact/phase8-bim-home-manifest.txt
+          grep -q '^frameCount=300$' phase8-bim-home-artifact/phase8-bim-home-manifest.txt
+          grep -q '^audioTested=false$' phase8-bim-home-artifact/phase8-bim-home-manifest.txt
+          grep -q '^modelMode=CURRENT_NATIVE_SKINNED_MASCOT_PROXY_WITH_BIM_REFERENCE_PALETTE$' phase8-bim-home-artifact/phase8-bim-home-manifest.txt
+          grep -q '^environmentMode=ENGINEERING_HOME_BACKDROP_OVER_NATIVE_RENDER_BACKGROUND$' phase8-bim-home-artifact/phase8-bim-home-manifest.txt
+          cat phase8-bim-home-artifact/phase8-bim-home-manifest.txt
+
+      - name: Upload Bim home animation
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase8-bim-home-${{ github.sha }}
+          path: phase8-bim-home-artifact/
+          if-no-files-found: error
+          retention-days: 14
