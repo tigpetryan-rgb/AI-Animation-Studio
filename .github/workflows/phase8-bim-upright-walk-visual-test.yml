@@ -1,0 +1,79 @@
+name: Phase 8 Bim Upright Walk Visual Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["m58/**"]
+    paths:
+      - "apps/studio-runtime-android/app/src/androidTest/java/com/aianimationstudio/runtime/NativePhase8BimUprightWalkInstrumentedTest.kt"
+      - "scripts/phase8-bim-upright-walk-emulator-test.sh"
+      - ".github/workflows/phase8-bim-upright-walk-visual-test.yml"
+
+jobs:
+  render-bim-upright-walk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Enable KVM permissions
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Render Bim upright walk in Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader -no-snapshot -noaudio -no-boot-anim
+          script: bash scripts/phase8-bim-upright-walk-emulator-test.sh
+
+      - name: Verify Bim upright-walk artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          MP4="$(find phase8-bim-upright-walk-artifact -maxdepth 1 -type f -name 'phase8-bim-upright-walk-*.mp4' | head -n 1)"
+          WEBP="$(find phase8-bim-upright-walk-artifact -maxdepth 1 -type f -name 'phase8-bim-upright-walk-*.webp' | head -n 1)"
+          test -n "$MP4" && test -s "$MP4"
+          test -n "$WEBP" && test -s "$WEBP"
+          test -s phase8-bim-upright-walk-artifact/bim-upright-preview-1.png
+          test -s phase8-bim-upright-walk-artifact/bim-upright-preview-2.png
+          test -s phase8-bim-upright-walk-artifact/bim-upright-preview-3.png
+          test -s phase8-bim-upright-walk-artifact/bim-upright-preview-4.png
+          test -s phase8-bim-upright-walk-artifact/bim-upright-preview-5.png
+          test -s phase8-bim-upright-walk-artifact/phase8-bim-upright-walk-manifest.txt
+          grep -q '^scope=BIM_UPRIGHT_WALK_PROOF$' phase8-bim-upright-walk-artifact/phase8-bim-upright-walk-manifest.txt
+          grep -q '^character=BIM$' phase8-bim-upright-walk-artifact/phase8-bim-upright-walk-manifest.txt
+          grep -q '^durationSeconds=10.0$' phase8-bim-upright-walk-artifact/phase8-bim-upright-walk-manifest.txt
+          grep -q '^frameRate=30.0$' phase8-bim-upright-walk-artifact/phase8-bim-upright-walk-manifest.txt
+          grep -q '^frameCount=300$' phase8-bim-upright-walk-artifact/phase8-bim-upright-walk-manifest.txt
+          grep -q '^audioTested=false$' phase8-bim-upright-walk-artifact/phase8-bim-upright-walk-manifest.txt
+          grep -q '^cameraMode=LOCKED_BIM_UPRIGHT_PROOF_CAMERA$' phase8-bim-upright-walk-artifact/phase8-bim-upright-walk-manifest.txt
+          grep -q '^modelMode=BIM_DEDICATED_NATIVE_SKINNED_MODEL_V1$' phase8-bim-upright-walk-artifact/phase8-bim-upright-walk-manifest.txt
+          grep -q '^gaitMode=EIGHT_HALF_STEP_ANALYTIC_PLANTED_STANCE_V1$' phase8-bim-upright-walk-artifact/phase8-bim-upright-walk-manifest.txt
+          grep -q '^visualVerdict=PENDING_HUMAN_REVIEW$' phase8-bim-upright-walk-artifact/phase8-bim-upright-walk-manifest.txt
+          cat phase8-bim-upright-walk-artifact/phase8-bim-upright-walk-manifest.txt
+
+      - name: Upload Bim upright-walk animation
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase8-bim-upright-walk-${{ github.sha }}
+          path: phase8-bim-upright-walk-artifact/
+          if-no-files-found: error
+          retention-days: 14
