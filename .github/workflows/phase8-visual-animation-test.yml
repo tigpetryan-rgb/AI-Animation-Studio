@@ -6,11 +6,10 @@ on:
     branches: ["m58/**"]
     paths:
       - "apps/studio-runtime-android/app/build.gradle.kts"
-      - "apps/studio-runtime-android/app/src/main/java/com/aianimationstudio/runtime/NativePhase8CodecExporter.kt"
-      - "apps/studio-runtime-android/app/src/main/java/com/aianimationstudio/runtime/NativePhase8CodecContract.kt"
       - "apps/studio-runtime-android/app/src/main/java/com/aianimationstudio/runtime/NativePhase8RenderPipeline.kt"
-      - "apps/studio-runtime-android/app/src/androidTest/java/com/aianimationstudio/runtime/NativePhase8VisualAnimationInstrumentedTest.kt"
-      - "scripts/phase8-visual-emulator-test.sh"
+      - "apps/studio-runtime-android/app/src/main/java/com/aianimationstudio/runtime/NativeSkinnedMeshRenderer3D.kt"
+      - "apps/studio-runtime-android/app/src/androidTest/java/com/aianimationstudio/runtime/NativePhase8CharacterMotionProofInstrumentedTest.kt"
+      - "scripts/phase8-motion-proof-emulator-test.sh"
       - ".github/workflows/phase8-visual-animation-test.yml"
 
 jobs:
@@ -37,7 +36,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Render actual Phase 8 3D animation in Android emulator
+      - name: Render locked-camera Phase 8 character motion in Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -46,26 +45,35 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader -no-snapshot -noaudio -no-boot-anim
-          script: bash scripts/phase8-visual-emulator-test.sh
+          script: bash scripts/phase8-motion-proof-emulator-test.sh
 
-      - name: Verify visual artifact bundle
+      - name: Verify character-motion artifact bundle
         shell: bash
         run: |
           set -euo pipefail
-          MP4="$(find phase8-visual-artifact -maxdepth 1 -type f -name 'phase8-visual-*.mp4' | head -n 1)"
+          MP4="$(find phase8-visual-artifact -maxdepth 1 -type f -name 'phase8-character-motion-*.mp4' | head -n 1)"
+          GIF="$(find phase8-visual-artifact -maxdepth 1 -type f -name 'phase8-character-motion-*.gif' | head -n 1)"
           test -n "$MP4"
+          test -n "$GIF"
           test -s "$MP4"
-          test -s phase8-visual-artifact/phase8-visual-preview-1.png
-          test -s phase8-visual-artifact/phase8-visual-preview-2.png
-          test -s phase8-visual-artifact/phase8-visual-preview-3.png
-          test -s phase8-visual-artifact/phase8-visual-manifest.txt
-          sha256sum "$MP4"
-          cat phase8-visual-artifact/phase8-visual-manifest.txt
+          test -s "$GIF"
+          test -s phase8-visual-artifact/phase8-character-preview-1.png
+          test -s phase8-visual-artifact/phase8-character-preview-2.png
+          test -s phase8-visual-artifact/phase8-character-preview-3.png
+          test -s phase8-visual-artifact/phase8-character-preview-4.png
+          test -s phase8-visual-artifact/phase8-motion-manifest.txt
+          test -s phase8-visual-artifact/phase8-character-motion.sha256
+          grep -q '^scope=CHARACTER_MOTION_PROOF_VIDEO_ONLY$' phase8-visual-artifact/phase8-motion-manifest.txt
+          grep -q '^audioTested=false$' phase8-visual-artifact/phase8-motion-manifest.txt
+          grep -q '^cameraMode=LOCKED_PHASE8_FIRST_CAMERA$' phase8-visual-artifact/phase8-motion-manifest.txt
+          grep -q '^frameCount=168$' phase8-visual-artifact/phase8-motion-manifest.txt
+          sha256sum "$MP4" "$GIF"
+          cat phase8-visual-artifact/phase8-motion-manifest.txt
 
-      - name: Upload viewable Phase 8 animation
+      - name: Upload viewable Phase 8 character motion
         uses: actions/upload-artifact@v4
         with:
-          name: phase8-visual-animation-${{ github.sha }}
+          name: phase8-character-motion-${{ github.sha }}
           path: phase8-visual-artifact/
           if-no-files-found: error
           retention-days: 14
