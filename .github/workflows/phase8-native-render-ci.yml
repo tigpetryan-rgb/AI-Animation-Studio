@@ -1,0 +1,74 @@
+name: Phase 8 Native Render CI
+
+on:
+  push:
+    branches: ["m58/**"]
+    paths:
+      - "apps/studio-runtime-android/**"
+      - ".github/workflows/phase8-native-render-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/studio-runtime-android/**"
+      - ".github/workflows/phase8-native-render-ci.yml"
+
+jobs:
+  verify-phase8-direct-render-binding:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android 16 platform
+        run: yes | sdkmanager "platforms;android-36"
+
+      - name: Capture exact source identity
+        run: |
+          SOURCE_SHA="$GITHUB_SHA"
+          SOURCE_DATE="$(git show -s --format=%cI "$SOURCE_SHA")"
+          echo "AISTUDIO_SOURCE_SHA=$SOURCE_SHA" >> "$GITHUB_ENV"
+          echo "AISTUDIO_SOURCE_DATE=$SOURCE_DATE" >> "$GITHUB_ENV"
+
+      - name: Verify Phase 8 direct native render boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE="apps/studio-runtime-android/app/src/main/java/com/aianimationstudio/runtime/NativePhase8RenderPipeline.kt"
+          grep -q --fixed-strings "NativeSkinnedMeshRenderer3D.render(" "$FILE"
+          grep -q --fixed-strings "worldBoundPerformance.tracks" "$FILE"
+          grep -q --fixed-strings "worldPlan.resolvedShots" "$FILE"
+          grep -q --fixed-strings "plan.renderGraph.jobs" "$FILE"
+          grep -q --fixed-strings "plan.timeline" "$FILE"
+          if grep -q -E 'NativeProductionCoordinator|NativeProductionSnapshot|android\.webkit|androidx\.webkit' "$FILE"; then
+            echo "Phase-8 direct renderer contains a forbidden legacy/browser production dependency." >&2
+            exit 1
+          fi
+          echo "Direct Phase-7 timeline/render-DAG -> world-bound native 3D render boundary PASS."
+
+      - name: Phase 8 exact frame binding acceptance gate
+        working-directory: apps/studio-runtime-android
+        run: |
+          ./gradlew \
+            :app:testReleaseUnitTest \
+            --tests "com.aianimationstudio.runtime.NativePhase8RenderPipelineTest" \
+            -PstudioCommitSha="${AISTUDIO_SOURCE_SHA}" \
+            -PstudioSourceDate="${AISTUDIO_SOURCE_DATE}" \
+            -PruntimeVersion="0.10.0-phase8-ci+${AISTUDIO_SOURCE_SHA:0:12}" \
+            -PruntimeVersionCode="${GITHUB_RUN_NUMBER}" \
+            --no-daemon
+
+      - name: Phase 8 objective 1 summary
+        run: |
+          echo "Phase 8 objective 1 PASS on exact SHA ${AISTUDIO_SOURCE_SHA}"
+          echo "Verified: accepted Phase-7 timeline/render DAG binds every contiguous frame directly to world-bound actor tracks, resolved production cameras and the native skinned-mesh renderer without legacy coordinator/snapshot or browser runtime detours."
