@@ -6,6 +6,9 @@ on:
     branches: ["m58/**"]
     paths:
       - "apps/studio-runtime-android/app/build.gradle.kts"
+      - "apps/studio-runtime-android/app/src/main/java/com/aianimationstudio/runtime/NativePhase8CodecExporter.kt"
+      - "apps/studio-runtime-android/app/src/main/java/com/aianimationstudio/runtime/NativePhase8CodecContract.kt"
+      - "apps/studio-runtime-android/app/src/main/java/com/aianimationstudio/runtime/NativePhase8RenderPipeline.kt"
       - "apps/studio-runtime-android/app/src/androidTest/java/com/aianimationstudio/runtime/NativePhase8VisualAnimationInstrumentedTest.kt"
       - "scripts/phase8-visual-emulator-test.sh"
       - ".github/workflows/phase8-visual-animation-test.yml"
