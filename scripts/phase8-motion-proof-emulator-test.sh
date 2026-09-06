@@ -61,7 +61,10 @@ fi
 command -v ffmpeg
 command -v ffprobe
 
-cp "$MANIFEST" phase8-visual-artifact/phase8-motion-manifest.txt
+ROOT_MANIFEST="phase8-visual-artifact/phase8-motion-manifest.txt"
+if [[ "$(realpath "$MANIFEST")" != "$(realpath -m "$ROOT_MANIFEST")" ]]; then
+  cp "$MANIFEST" "$ROOT_MANIFEST"
+fi
 MOTION_MP4="phase8-visual-artifact/phase8-character-motion-${SOURCE_SHA:0:12}.mp4"
 MOTION_GIF="phase8-visual-artifact/phase8-character-motion-${SOURCE_SHA:0:12}.gif"
 
