@@ -46,13 +46,18 @@ internal class CharacterMakerController(context: Context) {
     fun build(reference: PersistedReferenceAsset): CharacterMakerBuildResult {
         val blocking = when (
             val result = NativeSceneBlockingCompiler.compile(
-                chatId = CHARACTER_MAKER_ACTOR_ID,
+                chatId = CHARACTER_MAKER_CHAT_ID,
                 prompt = "ACTOR WAIT",
                 reference = reference,
             )
         ) {
             is NativeBlockingResult.Ready -> result.blocking
             is NativeBlockingResult.Rejected -> return CharacterMakerBuildResult.Rejected(result.diagnostics)
+        }
+        if (blocking.actorId != CHARACTER_MAKER_ACTOR_ID) {
+            return CharacterMakerBuildResult.Rejected(
+                listOf(NativeDiagnostic("CHARACTER_MAKER_ACTOR_ID", "Character Maker actor identity is not stable.")),
+            )
         }
 
         val rig = when (
@@ -107,6 +112,7 @@ internal class CharacterMakerController(context: Context) {
     }
 
     private companion object {
+        const val CHARACTER_MAKER_CHAT_ID = "character-maker"
         const val CHARACTER_MAKER_ACTOR_ID = "character-character-maker"
         const val CHARACTER_MAKER_SHOT_ID = "character-maker-definition"
     }
