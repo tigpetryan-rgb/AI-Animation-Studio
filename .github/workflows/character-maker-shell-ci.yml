@@ -1,0 +1,60 @@
+name: Character Maker Shell CI
+
+on:
+  push:
+    branches: ["m58/character-maker-shell"]
+    paths:
+      - "apps/studio-runtime-android/character-maker/**"
+      - "apps/studio-runtime-android/settings.gradle.kts"
+      - "apps/studio-runtime-android/app/src/main/java/**"
+      - ".github/workflows/character-maker-shell-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  character-maker-shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android 16 SDK
+        run: yes | sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Verify source boundary
+        run: |
+          test -f apps/studio-runtime-android/character-maker/src/main/java/com/aianimationstudio/runtime/CharacterMakerActivity.kt
+          grep -Fq 'exclude("**/MainActivity.kt")' apps/studio-runtime-android/character-maker/build.gradle.kts
+          grep -Fq 'applicationId = "com.aianimationstudio.charactermaker"' apps/studio-runtime-android/character-maker/build.gradle.kts
+          ! grep -R -E 'android\.webkit|WebView|OPENAI_API_KEY|sk-proj-' apps/studio-runtime-android/character-maker/src/main --include='*.kt' --include='*.xml'
+      - name: Build and test isolated shell
+        working-directory: apps/studio-runtime-android
+        run: |
+          ./gradlew :characterMaker:testReleaseUnitTest :characterMaker:lintRelease :characterMaker:assembleRelease \
+            -PstudioCommitSha="$GITHUB_SHA" \
+            -PstudioSourceDate="$(git show -s --format=%cI "$GITHUB_SHA")" \
+            -PruntimeVersion="0.1.0-character-shell+${GITHUB_SHA:0:12}" \
+            -PruntimeVersionCode="$GITHUB_RUN_NUMBER" --no-daemon
+      - name: Verify installable shell artifact
+        working-directory: apps/studio-runtime-android
+        run: |
+          set -euo pipefail
+          APK=character-maker/build/outputs/apk/release/character-maker-release.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.aianimationstudio.charactermaker'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F 'com.aianimationstudio.runtime.CharacterMakerActivity'
+          sha256sum "$APK" | tee character-maker/build/outputs/apk/release/CHARACTER_MAKER_SHA256.txt
+          printf 'source_sha=%s\nworkflow_run=%s\nstatus=development-shell-only\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > character-maker/build/outputs/apk/release/CHARACTER_MAKER_PROVENANCE.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: character-maker-shell-${{ github.sha }}
+          path: |
+            apps/studio-runtime-android/character-maker/build/outputs/apk/release/character-maker-release.apk
+            apps/studio-runtime-android/character-maker/build/outputs/apk/release/CHARACTER_MAKER_SHA256.txt
+            apps/studio-runtime-android/character-maker/build/outputs/apk/release/CHARACTER_MAKER_PROVENANCE.txt
+          if-no-files-found: error
+          retention-days: 14

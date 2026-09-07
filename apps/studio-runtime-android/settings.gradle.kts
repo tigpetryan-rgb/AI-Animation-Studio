@@ -16,3 +16,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "AIAnimationStudioRuntime"
 include(":app")
+include(":characterMaker")
+project(":characterMaker").projectDir = file("character-maker")
