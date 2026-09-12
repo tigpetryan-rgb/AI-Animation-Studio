@@ -75,6 +75,7 @@ class NativeActorPerformancePhase4Test {
         assertEquals(asset.actorId, performance.canonical.actorId)
         assertEquals(sourceSha, performance.canonical.sourceCommit)
         assertTrue(performance.acceptance.done)
+        assertTrue(performance.acceptance.sceneValidityGate)
         assertTrue(performance.acceptance.scriptCoverageGate)
         assertTrue(performance.acceptance.rootMotionGate)
         assertTrue(performance.acceptance.retargetingGate)
@@ -147,6 +148,7 @@ class NativeActorPerformancePhase4Test {
         assertTrue(result is NativePhase4PerformanceResult.Ready)
         val acceptance = (result as NativePhase4PerformanceResult.Ready).performance.acceptance
         assertFalse(acceptance.done)
+        assertTrue(acceptance.sceneValidityGate)
         assertFalse(acceptance.scriptCoverageGate)
         assertFalse(acceptance.contactIkGate)
     }

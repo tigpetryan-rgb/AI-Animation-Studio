@@ -250,7 +250,7 @@ internal object NativeWorldLightingPhase6Engine {
         world: NativePhase6WorldState,
     ): List<NativeDiagnostic> {
         val diagnostics = mutableListOf<NativeDiagnostic>()
-        if (!performance.acceptance.done) diagnostics += NativeDiagnostic("PHASE6_PERFORMANCE", "Phase 6 requires an accepted Phase-4 performance.")
+        if (!performance.acceptance.sceneValidityGate) diagnostics += NativeDiagnostic("PHASE6_PERFORMANCE", "Phase 6 requires a scene-valid Phase-4 performance.")
         if (!cameraPlan.acceptance.done) diagnostics += NativeDiagnostic("PHASE6_CAMERA", "Phase 6 requires an accepted Phase-5 camera plan.")
         if (world.sourceCommit != performance.canonical.sourceCommit || world.sourceCommit != cameraPlan.sourceCommit) {
             diagnostics += NativeDiagnostic("PHASE6_SOURCE_IDENTITY", "World, performance and camera plan must share the same exact source commit.")
@@ -362,7 +362,8 @@ internal object NativeWorldLightingPhase6Engine {
             states[prop.id] = after
             transitions += NativePhase6PropTransition(step.endTimeSeconds, prop.id, before, after, step.action)
         }
-        return Triple(transitions, states.toMap(), valid && transitions.isNotEmpty())
+        val requestedTransitions = steps.count { it.action in propActions }
+        return Triple(transitions, states.toMap(), valid && transitions.size == requestedTransitions)
     }
 
     private fun buildCollisionSamples(

@@ -75,12 +75,6 @@ class NativePhase8BimUprightWalkInstrumentedTest {
                     sourceExcerpt = "առաջ",
                 ),
                 NativeSceneActionDraft(
-                    concept = NativeSceneConcept.PICK_UP,
-                    actorId = request.actorId,
-                    targetId = "proof_prop",
-                    sourceExcerpt = "proof contact",
-                ),
-                NativeSceneActionDraft(
                     concept = NativeSceneConcept.REACT,
                     actorId = request.actorId,
                     sourceExcerpt = "proof reaction",

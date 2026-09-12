@@ -47,7 +47,12 @@ internal data class NativePhase4Step(
     val targetAnchor: NativeStagePoint?,
 )
 
+/**
+ * [sceneValidityGate] validates the actions requested by one scene. [done] remains the broader
+ * Phase-4 capability proof, which intentionally exercises locomotion, interaction, reaction, and layers together.
+ */
 internal data class NativePhase4Acceptance(
+    val sceneValidityGate: Boolean,
     val scriptCoverageGate: Boolean,
     val rootMotionGate: Boolean,
     val retargetingGate: Boolean,
@@ -57,7 +62,8 @@ internal data class NativePhase4Acceptance(
     val continuityGate: Boolean,
 ) {
     val done: Boolean
-        get() = scriptCoverageGate &&
+        get() = sceneValidityGate &&
+            scriptCoverageGate &&
             rootMotionGate &&
             retargetingGate &&
             contactIkGate &&
@@ -475,7 +481,39 @@ internal object NativeActorPerformancePhase4Engine {
         }
         val continuity = stopped && trackContinuity && contacts.all { finite(it.anchor) && finite(it.solvedPosition) }
 
+        val interactionSteps = steps.filter { it.action in interactionActions }
+        val graspSteps = steps.filter {
+            it.action in setOf(NativeStoryAction.PICK_UP, NativeStoryAction.RECEIVE, NativeStoryAction.USE)
+        }
+        val exactStoryProjection = steps.size == canonical.story.events.size &&
+            steps.zip(canonical.story.events).all { (step, event) ->
+                step.sourceEventId == event.id &&
+                    step.action == event.type &&
+                    step.targetId == event.targetId
+            }
+        val validContactSolutions = contacts.isNotEmpty() && contacts.all { contact ->
+            contact.startTimeSeconds >= 0.0 &&
+                contact.endTimeSeconds >= contact.startTimeSeconds &&
+                contact.endTimeSeconds <= canonical.durationSeconds &&
+                contact.maxErrorMeters <= 0.03 &&
+                distance(contact.anchor, contact.solvedPosition) <= contact.maxErrorMeters
+        }
+        fun covers(step: NativePhase4Step, kind: NativePhase4ContactKind): Boolean = contacts.any { contact ->
+            contact.kind == kind &&
+                contact.targetId == step.targetId &&
+                contact.startTimeSeconds < step.endTimeSeconds &&
+                contact.endTimeSeconds > step.startTimeSeconds
+        }
+        val requestedActionEffects =
+            (actions.none { it in locomotionActions } || rootMotion) &&
+                interactionSteps.all { covers(it, NativePhase4ContactKind.RIGHT_HAND) } &&
+                graspSteps.all { covers(it, NativePhase4ContactKind.PROP_GRASP) } &&
+                (NativeStoryAction.REACT !in actions || emotionReaction)
+        val sceneValidity = exactStoryProjection && validContactSolutions && requestedActionEffects &&
+            retargeting && layered && continuity
+
         return NativePhase4Acceptance(
+            sceneValidityGate = sceneValidity,
             scriptCoverageGate = scriptCoverage,
             rootMotionGate = rootMotion && stopped,
             retargetingGate = retargeting,

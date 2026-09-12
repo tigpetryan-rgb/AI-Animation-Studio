@@ -100,6 +100,18 @@ internal object NativeProductionOrchestrationPhase7Engine {
         NativeSceneConcept.ENVIRONMENT_CHANGE,
     )
 
+    private val propStateActions = setOf(
+        NativeStoryAction.PICK_UP,
+        NativeStoryAction.PUT_DOWN,
+        NativeStoryAction.GIVE,
+        NativeStoryAction.RECEIVE,
+        NativeStoryAction.USE,
+        NativeStoryAction.OPEN,
+        NativeStoryAction.CLOSE,
+        NativeStoryAction.LOCK,
+        NativeStoryAction.UNLOCK,
+    )
+
     fun execute(
         chatId: String,
         prompt: String,
@@ -203,11 +215,11 @@ internal object NativeProductionOrchestrationPhase7Engine {
             )
         val entityStateGate = entities.any { it.id == ir.actorId && it.kind == NativePhase7EntityKind.CHARACTER } &&
             ir.actions.filter { it.targetId != null }.all { action -> entities.any { it.id == action.targetId } } &&
-            worldPlan.propTransitions.isNotEmpty()
+            worldPlan.propTransitions.size == worldPlan.resolvedSteps.count { it.action in propStateActions }
         val characterPerformanceGate = asset.sourceCommit == sourceCommit &&
             asset.referenceSha256 == exactReference.sha256 &&
             NativeCharacterAsset3DValidator.validate(asset).isEmpty() &&
-            performance.acceptance.done && worldBound.acceptance.done
+            performance.acceptance.sceneValidityGate && worldBound.acceptance.done
         val cameraWorldLightingGate = camera.acceptance.done && worldPlan.acceptance.done
         val controlCoverageGate = controls.all { concept ->
             when (concept) {

@@ -110,8 +110,8 @@ internal object NativeVirtualDirectorPhase5Engine {
         aspectRatio: Double = 16.0 / 9.0,
     ): NativePhase5DirectorResult {
         val diagnostics = mutableListOf<NativeDiagnostic>()
-        if (!performance.acceptance.done) {
-            diagnostics += NativeDiagnostic("PHASE5_PERFORMANCE", "Phase 5 requires a Phase-4 performance that has passed its DONE gate.")
+        if (!performance.acceptance.sceneValidityGate) {
+            diagnostics += NativeDiagnostic("PHASE5_PERFORMANCE", "Phase 5 requires a scene-valid Phase-4 performance.")
         }
         if (!Regex("^[0-9a-f]{40}$").matches(performance.canonical.sourceCommit)) {
             diagnostics += NativeDiagnostic("PHASE5_SOURCE_IDENTITY", "Phase 5 requires the exact 40-character source commit from the accepted performance.")
@@ -352,9 +352,14 @@ internal object NativeVirtualDirectorPhase5Engine {
         val nonZeroSides = samples.map { it.eyelineSide }.filter { it != 0 }
         val eyeline = nonZeroSides.isNotEmpty() && nonZeroSides.distinct().size == 1
         val manyCameras = shots.size >= 4 && shots.map { Triple(it.size, it.lensMm, it.motion) }.distinct().size >= 4
-        val storyIntent = shots.any { it.action in locomotion && it.size == NativePhase5ShotSize.WIDE && it.motion == NativePhase5CameraMotion.TRACKING } &&
-            shots.any { it.action in interaction && it.size == NativePhase5ShotSize.MEDIUM_CLOSE } &&
-            shots.any { it.action == NativeStoryAction.REACT && it.size == NativePhase5ShotSize.CLOSE_UP }
+        val requestedActions = performance.steps.map { it.action }.toSet()
+        val storyIntent =
+            (requestedActions.none { it in locomotion } ||
+                shots.any { it.action in locomotion && it.size == NativePhase5ShotSize.WIDE && it.motion == NativePhase5CameraMotion.TRACKING }) &&
+                (requestedActions.none { it in interaction } ||
+                    shots.any { it.action in interaction && it.size == NativePhase5ShotSize.MEDIUM_CLOSE }) &&
+                (NativeStoryAction.REACT !in requestedActions ||
+                    shots.any { it.action == NativeStoryAction.REACT && it.size == NativePhase5ShotSize.CLOSE_UP })
         return NativePhase5Acceptance(
             shotLanguageGate = shotLanguage,
             framingLensGate = framingLens,

@@ -1,6 +1,7 @@
 package com.aianimationstudio.runtime
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -10,6 +11,7 @@ class NativeProductionOrchestrationPhase7Test {
     private val sourceSha = "89abcdef0123456789abcdef0123456789abcdef"
     private val referenceSha = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
     private val prompt = "Դերասանը քայլում է դեպի տուփը, կանգնում է, նայում է տուփին, վերցնում է այն և արձագանքում։ Փոխիր միջավայրը, լույսը և շարժիր տեսախցիկը։ 14 վայրկյան 320x240 12 fps"
+    private val walkOnlyPrompt = "Բիմը բնական քայլում է առաջ, կանգնում է, նայում է առաջ և արձագանքում։ 14 վայրկյան 320x240 12 fps"
 
     private fun reference() = PersistedReferenceAsset(
         displayName = "phase7-character.png",
@@ -82,13 +84,55 @@ class NativeProductionOrchestrationPhase7Test {
         )
     }
 
-    private fun execute(text: String = prompt): NativePhase7OrchestrationResult =
+    private val walkOnlyBackend = NativeSceneSemanticBackend { request ->
+        NativeSceneSemanticDocument(
+            detectedLanguage = NativeSceneLanguage.ARMENIAN,
+            normalizedText = request.originalText.trim(),
+            provider = "PHASE7_TEST_SEMANTIC_BACKEND",
+            model = "phase7-walk-only-fixture-v1",
+            output = NativeSceneOutput(
+                width = 320,
+                height = 240,
+                frameRate = 12.0,
+                durationSeconds = 14.0,
+            ),
+            actions = listOf(
+                NativeSceneActionDraft(
+                    concept = NativeSceneConcept.WALK_TO,
+                    actorId = request.actorId,
+                    targetId = "walk_mark",
+                    sourceExcerpt = "բնական քայլում է առաջ",
+                ),
+                NativeSceneActionDraft(
+                    concept = NativeSceneConcept.WAIT,
+                    actorId = request.actorId,
+                    sourceExcerpt = "կանգնում է",
+                ),
+                NativeSceneActionDraft(
+                    concept = NativeSceneConcept.LOOK_AT,
+                    actorId = request.actorId,
+                    targetId = "walk_mark",
+                    sourceExcerpt = "նայում է առաջ",
+                ),
+                NativeSceneActionDraft(
+                    concept = NativeSceneConcept.REACT,
+                    actorId = request.actorId,
+                    sourceExcerpt = "արձագանքում է",
+                ),
+            ),
+        )
+    }
+
+    private fun execute(
+        text: String = prompt,
+        semanticBackend: NativeSceneSemanticBackend = backend,
+    ): NativePhase7OrchestrationResult =
         NativeProductionOrchestrationPhase7Engine.execute(
             chatId = "phase7-armenian-orchestration",
             prompt = text,
             reference = reference(),
             sourceCommit = sourceSha,
-            backend = backend,
+            backend = semanticBackend,
         )
 
     @Test
@@ -165,6 +209,29 @@ class NativeProductionOrchestrationPhase7Test {
             left.deterministicFingerprint,
             (changed as NativePhase7OrchestrationResult.Ready).plan.deterministicFingerprint,
         )
+    }
+
+    @Test
+    fun `walk only scene reaches production without fabricated prop interaction`() {
+        val result = execute(walkOnlyPrompt, walkOnlyBackend)
+        assertTrue(result is NativePhase7OrchestrationResult.Ready)
+        val plan = (result as NativePhase7OrchestrationResult.Ready).plan
+
+        assertTrue(plan.acceptance.done)
+        assertTrue(plan.performance.acceptance.sceneValidityGate)
+        assertFalse(plan.performance.acceptance.done)
+        assertTrue(plan.cameraPlan.acceptance.done)
+        assertTrue(plan.worldPlan.acceptance.done)
+        assertTrue(plan.worldBoundPerformance.acceptance.done)
+        assertTrue(plan.entities.any { it.id == "walk_mark" && it.kind == NativePhase7EntityKind.LOCATION })
+        assertTrue(plan.worldPlan.world.props.isEmpty())
+        assertTrue(plan.worldPlan.propTransitions.isEmpty())
+        assertTrue(plan.worldPlan.finalPropStates.isEmpty())
+        assertTrue(plan.worldBoundPerformance.contacts.none { it.targetId != null })
+        assertFalse(plan.story.ir.events.any {
+            it.type in setOf(NativeStoryAction.PICK_UP, NativeStoryAction.RECEIVE, NativeStoryAction.USE)
+        })
+        assertEquals(168, plan.timeline.totalFrames)
     }
 
     @Test
