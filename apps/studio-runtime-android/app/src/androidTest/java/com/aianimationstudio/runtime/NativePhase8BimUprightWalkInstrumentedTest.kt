@@ -488,10 +488,11 @@ class NativePhase8BimUprightWalkInstrumentedTest {
         var maxDrift = 0.0
         repeat(HALF_STEP_COUNT) { step ->
             val startTime = step * HALF_STEP_SECONDS
+            val endTimeExclusive = minOf(startTime + HALF_STEP_SECONDS, DURATION_SECONDS) - 1e-6
             val anchor = stanceFootContact(gaitSample(startTime + 1e-6))
             for (sampleIndex in 0..30) {
                 val fraction = sampleIndex / 30.0
-                val time = (startTime + fraction * HALF_STEP_SECONDS).coerceAtMost(DURATION_SECONDS - 1e-6)
+                val time = minOf(startTime + fraction * HALF_STEP_SECONDS, endTimeExclusive)
                 val current = stanceFootContact(gaitSample(time))
                 maxDrift = maxOf(maxDrift, distance(anchor, current))
             }
