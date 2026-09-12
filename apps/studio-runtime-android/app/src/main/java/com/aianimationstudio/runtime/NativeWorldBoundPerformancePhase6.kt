@@ -67,10 +67,14 @@ internal object NativeWorldBoundPerformancePhase6Binder {
 
         val targetedOriginal = original.contacts.filter { it.targetId != null }
         val targetedBound = contacts.filter { it.targetId != null }
-        val canonicalTargetContactGate = targetedBound.isNotEmpty() && targetedBound.all { contact ->
-            val canonical = contact.targetId?.let { canonicalAnchors[it]?.position }
-            canonical != null && distance(contact.anchor, canonical) <= 1e-9 && distance(contact.solvedPosition, canonical) <= 1e-9
-        } && targetedOriginal.zip(targetedBound).any { (before, after) -> distance(before.anchor, after.anchor) > 0.05 }
+        val canonicalTargetContactGate = if (targetedOriginal.isEmpty()) {
+            targetedBound.isEmpty()
+        } else {
+            targetedOriginal.size == targetedBound.size && targetedBound.all { contact ->
+                val canonical = contact.targetId?.let { canonicalAnchors[it]?.position }
+                canonical != null && distance(contact.anchor, canonical) <= 1e-9 && distance(contact.solvedPosition, canonical) <= 1e-9
+            } && targetedOriginal.zip(targetedBound).any { (before, after) -> distance(before.anchor, after.anchor) > 0.05 }
+        }
 
         val rootRebaseGate = tracks.isNotEmpty() && tracks.zip(original.canonical.tracks).all { (boundTrack, originalTrack) ->
             boundTrack.keyframes.size == originalTrack.keyframes.size && boundTrack.keyframes.all { frame ->
@@ -88,7 +92,7 @@ internal object NativeWorldBoundPerformancePhase6Binder {
 
         val propIds = plan.world.props.map { it.semanticId }.toSet()
         val propActions = plan.resolvedSteps.filter { it.action in setOf(NativeStoryAction.PICK_UP, NativeStoryAction.RECEIVE, NativeStoryAction.USE) }
-        val propInteractionContactGate = propActions.isNotEmpty() && propActions.all { step ->
+        val propInteractionContactGate = propActions.all { step ->
             step.targetId in propIds &&
                 contacts.any { it.targetId == step.targetId && it.kind == NativePhase4ContactKind.RIGHT_HAND && overlaps(it, step) } &&
                 contacts.any { it.targetId == step.targetId && it.kind == NativePhase4ContactKind.PROP_GRASP && overlaps(it, step) }

@@ -137,7 +137,7 @@ class NativeVirtualDirectorPhase5Test {
     }
 
     @Test
-    fun `phase5 fails closed when phase4 done gate is not satisfied`() {
+    fun `phase5 fails closed when phase4 scene validity gate is not satisfied`() {
         val asset = capturedAsset()
         val story = NativeStoryCompiler.compile(
             "ACTOR WAIT\nACTOR LOOK_AT BOX",
@@ -152,8 +152,12 @@ class NativeVirtualDirectorPhase5Test {
         assertTrue(phase4 is NativePhase4PerformanceResult.Ready)
         val incomplete = (phase4 as NativePhase4PerformanceResult.Ready).performance
         assertFalse(incomplete.acceptance.done)
+        assertTrue(incomplete.acceptance.sceneValidityGate)
+        val invalid = incomplete.copy(
+            acceptance = incomplete.acceptance.copy(sceneValidityGate = false),
+        )
 
-        val result = NativeVirtualDirectorPhase5Engine.execute(incomplete)
+        val result = NativeVirtualDirectorPhase5Engine.execute(invalid)
         assertTrue(result is NativePhase5DirectorResult.Rejected)
         val diagnostics = (result as NativePhase5DirectorResult.Rejected).diagnostics
         assertTrue(diagnostics.any { it.code == "PHASE5_PERFORMANCE" })
